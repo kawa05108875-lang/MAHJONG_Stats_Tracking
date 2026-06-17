@@ -1,0 +1,29 @@
+# Firestore Rules貼り付け用
+
+Firebase Consoleの `Firestore Database` → `ルール` に、下の内容だけをコピーして貼り付けてください。
+
+```js
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, create, update: if isSelf(uid);
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
