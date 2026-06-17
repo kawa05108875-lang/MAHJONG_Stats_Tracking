@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import type { User } from "firebase/auth";
 import {
   createPlayer,
+  deleteUnusedPlayer,
   getGroupPlayers,
   updatePlayerName,
   type PlayerSummary,
@@ -156,6 +157,42 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
     }
   }
 
+  async function handleDeletePlayer(player: PlayerSummary) {
+    const confirmed = window.confirm(
+      `${player.name} を削除します。半荘で使用済みの場合は削除できません。`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await deleteUnusedPlayer({
+        groupId,
+        playerId: player.playerId,
+      });
+
+      await loadPlayers();
+      notifyPlayersChanged(groupId);
+    } catch (deleteError) {
+      const message =
+        deleteError instanceof Error
+          ? deleteError.message
+          : "プレイヤー削除に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "プレイヤーを削除できませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="manager-panel">
       <div className="section-header">
@@ -238,9 +275,19 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
                       : "手入力プレイヤー"}
                   </span>
                 </div>
-                <button type="button" onClick={() => startEditing(player)}>
-                  編集
-                </button>
+                <div className="row-actions">
+                  <button type="button" onClick={() => startEditing(player)}>
+                    編集
+                  </button>
+                  <button
+                    type="button"
+                    className="danger-button"
+                    disabled={saving}
+                    onClick={() => void handleDeletePlayer(player)}
+                  >
+                    削除
+                  </button>
+                </div>
               </>
             )}
           </div>
