@@ -72,11 +72,24 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     [players, seatPlayerIds],
   );
 
+  const selectedPlayerIds = seatPlayerIds.filter(Boolean);
+  const uniqueSelectedPlayerCount = new Set(selectedPlayerIds).size;
   const canCreateMatch =
     selectedPlayers.length === 4 &&
-    new Set(seatPlayerIds).size === 4 &&
+    uniqueSelectedPlayerCount === 4 &&
     seatPlayerIds.every(Boolean) &&
     Boolean(dealerPlayerId);
+  const disabledReason = !canCreateMatch
+    ? players.length < 4
+      ? "半荘作成には4人以上のプレイヤー登録が必要です。"
+      : selectedPlayerIds.length < 4
+        ? "4つの席すべてにプレイヤーを選択してください。"
+        : uniqueSelectedPlayerCount < 4
+          ? "同じプレイヤーが重複しています。"
+          : !dealerPlayerId
+            ? "起家を選択してください。"
+            : null
+    : null;
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -113,6 +126,22 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
     return () => window.clearTimeout(timeoutId);
   }, [loadData]);
+
+  useEffect(() => {
+    function handlePlayersChanged(event: Event) {
+      const customEvent = event as CustomEvent<{ groupId?: string }>;
+
+      if (customEvent.detail?.groupId === group.groupId) {
+        void loadData();
+      }
+    }
+
+    window.addEventListener("mahjong:players-changed", handlePlayersChanged);
+
+    return () => {
+      window.removeEventListener("mahjong:players-changed", handlePlayersChanged);
+    };
+  }, [group.groupId, loadData]);
 
   function updateSeat(index: number, playerId: string) {
     setSeatPlayerIds((current) => {
@@ -197,6 +226,10 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       </div>
 
       <form className="match-form" onSubmit={handleCreateMatch}>
+        <p className="notice-text">
+          登録済みプレイヤー: {players.length}人 / 選択中: {selectedPlayers.length}人
+        </p>
+
         <label htmlFor="matchDate">対局日</label>
         <input
           id="matchDate"
@@ -347,9 +380,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         </button>
       </form>
 
-      {players.length > 0 && players.length < 4 ? (
-        <p className="notice-text">半荘作成には4人以上のプレイヤー登録が必要です。</p>
-      ) : null}
+      {disabledReason ? <p className="notice-text">{disabledReason}</p> : null}
 
       {createdMatchId ? (
         <p className="success-text">半荘を作成しました。局入力はフェーズ6で追加します。</p>
