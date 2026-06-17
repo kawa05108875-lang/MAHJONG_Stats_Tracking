@@ -10,9 +10,34 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function groupMemberPath(groupId, uid) {
+      return /databases/$(database)/documents/groupMembers/$(groupId + "_" + uid);
+    }
+
+    function isGroupMember(groupId) {
+      return isSignedIn() && exists(groupMemberPath(groupId, request.auth.uid));
+    }
+
     match /users/{uid} {
       allow read, create, update: if isSelf(uid);
       allow delete: if false;
+    }
+
+    match /groups/{groupId} {
+      allow read, update: if isGroupMember(groupId);
+      allow create: if isSignedIn()
+        && request.resource.data.groupId == groupId
+        && request.resource.data.createdBy == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /groupMembers/{groupMemberId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == "member"
+        && groupMemberId == request.resource.data.groupId + "_" + request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /{document=**} {
