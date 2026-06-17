@@ -369,6 +369,21 @@ select:focus {
   gap: 8px;
 }
 
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.danger-button {
+  border-color: rgba(180, 35, 24, 0.32);
+  color: var(--danger);
+}
+
+.danger-button:hover {
+  border-color: var(--danger);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -521,6 +536,11 @@ select:focus {
   }
 
   .match-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .row-actions {
     align-items: stretch;
     flex-direction: column;
   }

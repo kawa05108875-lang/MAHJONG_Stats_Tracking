@@ -58,7 +58,7 @@ service cloud.firestore {
         && request.resource.data.playerId == resource.data.playerId
         && request.resource.data.groupId == resource.data.groupId
         && request.resource.data.linkedUid == resource.data.linkedUid;
-      allow delete: if false;
+      allow delete: if isGroupMember(resource.data.groupId);
     }
 
     match /playerStats/{playerId} {
@@ -68,7 +68,7 @@ service cloud.firestore {
       allow update: if isGroupMember(resource.data.groupId)
         && request.resource.data.playerId == resource.data.playerId
         && request.resource.data.groupId == resource.data.groupId;
-      allow delete: if false;
+      allow delete: if isGroupMember(resource.data.groupId);
     }
 
     match /matches/{matchId} {

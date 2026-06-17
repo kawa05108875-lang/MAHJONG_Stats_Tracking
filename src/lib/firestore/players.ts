@@ -9,7 +9,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
-import type { Player } from "@/types";
+import type { Match, Player } from "@/types";
 
 export type PlayerSummary = Pick<
   Player,
@@ -103,4 +103,31 @@ export async function updatePlayerName(params: {
     name: params.name,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function deleteUnusedPlayer(params: {
+  groupId: string;
+  playerId: string;
+}) {
+  const db = getFirebaseDb();
+  const matchesQuery = query(
+    collection(db, "matches"),
+    where("groupId", "==", params.groupId),
+  );
+  const matchSnapshots = await getDocs(matchesQuery);
+  const isUsed = matchSnapshots.docs.some((snapshot) => {
+    const match = snapshot.data() as Match;
+
+    return match.players.some((player) => player.playerId === params.playerId);
+  });
+
+  if (isUsed) {
+    throw new Error("このプレイヤーは半荘で使用済みのため削除できません。");
+  }
+
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "players", params.playerId));
+  batch.delete(doc(db, "playerStats", params.playerId));
+
+  await batch.commit();
 }
