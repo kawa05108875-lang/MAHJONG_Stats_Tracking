@@ -16,7 +16,7 @@ type MatchCreatorProps = {
   user: User;
 };
 
-const SEAT_LABELS = ["席1", "席2", "席3", "席4"] as const;
+const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -45,7 +45,6 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [matches, setMatches] = useState<MatchSummary[]>([]);
   const [date, setDate] = useState(todayString());
   const [seatPlayerIds, setSeatPlayerIds] = useState<string[]>(["", "", "", ""]);
-  const [dealerPlayerId, setDealerPlayerId] = useState("");
   const [ruleForm, setRuleForm] = useState(() => createRuleForm(group.defaultRule));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -77,18 +76,15 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const canCreateMatch =
     selectedPlayers.length === 4 &&
     uniqueSelectedPlayerCount === 4 &&
-    seatPlayerIds.every(Boolean) &&
-    Boolean(dealerPlayerId);
+    seatPlayerIds.every(Boolean);
   const disabledReason = !canCreateMatch
     ? players.length < 4
       ? "半荘作成には4人以上のプレイヤー登録が必要です。"
       : selectedPlayerIds.length < 4
-        ? "4つの席すべてにプレイヤーを選択してください。"
+        ? "東家、南家、西家、北家をすべて選択してください。"
         : uniqueSelectedPlayerCount < 4
           ? "同じプレイヤーが重複しています。"
-          : !dealerPlayerId
-            ? "起家を選択してください。"
-            : null
+          : null
     : null;
 
   const loadData = useCallback(async () => {
@@ -148,10 +144,6 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       const next = [...current];
       next[index] = playerId;
 
-      if (!next.includes(dealerPlayerId)) {
-        setDealerPlayerId("");
-      }
-
       return next;
     });
   }
@@ -188,14 +180,13 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         groupId: group.groupId,
         date,
         players: selectedPlayers,
-        dealerPlayerId,
+        dealerPlayerId: seatPlayerIds[0],
         rule: buildRule(),
         uid: user.uid,
       });
 
       setCreatedMatchId(matchId);
       setSeatPlayerIds(["", "", "", ""]);
-      setDealerPlayerId("");
       await loadData();
     } catch (createError) {
       const message =
@@ -264,21 +255,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
           ))}
         </div>
 
-        <label className="select-field" htmlFor="dealerPlayer">
-          <span>起家</span>
-          <select
-            id="dealerPlayer"
-            value={dealerPlayerId}
-            onChange={(event) => setDealerPlayerId(event.target.value)}
-          >
-            <option value="">選択</option>
-            {selectedPlayers.map((player) => (
-              <option key={player.playerId} value={player.playerId}>
-                {player.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <p className="notice-text">起家は東家として保存されます。</p>
 
         <div className="rule-grid">
           <label>
