@@ -1,6 +1,6 @@
 # Firestore Rules貼り付け用
 
-Firebase Consoleの `Firestore Database` → `ルール` に、下の内容だけをコピーして貼り付けてください。
+Firebase Consoleの `Firestore Database` -> `ルール` に、下の内容だけをコピーして貼り付けてください。
 
 ```js
 rules_version = '2';
@@ -15,8 +15,59 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function groupMemberPath(groupId, uid) {
+      return /databases/$(database)/documents/groupMembers/$(groupId + "_" + uid);
+    }
+
+    function isGroupMember(groupId) {
+      return isSignedIn() && exists(groupMemberPath(groupId, request.auth.uid));
+    }
+
     match /users/{uid} {
       allow read, create, update: if isSelf(uid);
+      allow delete: if false;
+    }
+
+    match /groups/{groupId} {
+      allow read, update: if isGroupMember(groupId);
+      allow create: if isSignedIn()
+        && request.resource.data.groupId == groupId
+        && request.resource.data.createdBy == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /groupMembers/{groupMemberId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == "member"
+        && groupMemberId == request.resource.data.groupId + "_" + request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /players/{playerId} {
+      allow read: if isGroupMember(resource.data.groupId);
+      allow create: if isGroupMember(request.resource.data.groupId)
+        && request.resource.data.playerId == playerId
+        && (
+          !("linkedUid" in request.resource.data)
+          || request.resource.data.linkedUid == null
+          || request.resource.data.linkedUid == request.auth.uid
+        );
+      allow update: if isGroupMember(resource.data.groupId)
+        && request.resource.data.playerId == resource.data.playerId
+        && request.resource.data.groupId == resource.data.groupId
+        && request.resource.data.linkedUid == resource.data.linkedUid;
+      allow delete: if false;
+    }
+
+    match /playerStats/{playerId} {
+      allow read: if isGroupMember(resource.data.groupId);
+      allow create: if isGroupMember(request.resource.data.groupId)
+        && request.resource.data.playerId == playerId;
+      allow update: if isGroupMember(resource.data.groupId)
+        && request.resource.data.playerId == resource.data.playerId
+        && request.resource.data.groupId == resource.data.groupId;
       allow delete: if false;
     }
 
@@ -26,4 +77,3 @@ service cloud.firestore {
   }
 }
 ```
-

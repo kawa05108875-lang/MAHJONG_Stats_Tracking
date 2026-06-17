@@ -40,6 +40,32 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /players/{playerId} {
+      allow read: if isGroupMember(resource.data.groupId);
+      allow create: if isGroupMember(request.resource.data.groupId)
+        && request.resource.data.playerId == playerId
+        && (
+          !("linkedUid" in request.resource.data)
+          || request.resource.data.linkedUid == null
+          || request.resource.data.linkedUid == request.auth.uid
+        );
+      allow update: if isGroupMember(resource.data.groupId)
+        && request.resource.data.playerId == resource.data.playerId
+        && request.resource.data.groupId == resource.data.groupId
+        && request.resource.data.linkedUid == resource.data.linkedUid;
+      allow delete: if false;
+    }
+
+    match /playerStats/{playerId} {
+      allow read: if isGroupMember(resource.data.groupId);
+      allow create: if isGroupMember(request.resource.data.groupId)
+        && request.resource.data.playerId == playerId;
+      allow update: if isGroupMember(resource.data.groupId)
+        && request.resource.data.playerId == resource.data.playerId
+        && request.resource.data.groupId == resource.data.groupId;
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

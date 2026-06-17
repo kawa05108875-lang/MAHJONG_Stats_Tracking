@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { User } from "firebase/auth";
+import { PlayerManager } from "@/components/player-manager";
 import {
   createGroup,
   getJoinedGroups,
@@ -205,6 +206,8 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                 </div>
               </div>
 
+              <PlayerManager groupId={selectedGroup.groupId} user={user} />
+
               <div className="placeholder-grid">
                 <div>
                   <h3>最近の半荘</h3>
@@ -213,10 +216,6 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                 <div>
                   <h3>ランキング概要</h3>
                   <p className="muted">フェーズ8で成績集計後に表示します。</p>
-                </div>
-                <div>
-                  <h3>メンバー管理</h3>
-                  <p className="muted">フェーズ4でプレイヤー登録を追加します。</p>
                 </div>
               </div>
             </>
