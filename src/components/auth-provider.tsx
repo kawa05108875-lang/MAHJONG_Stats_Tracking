@@ -32,6 +32,24 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function upsertUserProfile(currentUser: User) {
+  const userRef = doc(getFirebaseDb(), "users", currentUser.uid);
+  const userSnapshot = await getDoc(userRef);
+
+  await setDoc(
+    userRef,
+    {
+      uid: currentUser.uid,
+      displayName: currentUser.displayName,
+      email: currentUser.email,
+      photoURL: currentUser.photoURL,
+      updatedAt: serverTimestamp(),
+      ...(userSnapshot.exists() ? {} : { createdAt: serverTimestamp() }),
+    },
+    { merge: true },
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(isFirebaseConfigured);
@@ -42,9 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), (currentUser) => {
+    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+
+      if (currentUser) {
+        try {
+          await upsertUserProfile(currentUser);
+        } catch {
+          setError("Firestoreへのユーザー情報保存に失敗しました。");
+        }
+      }
     });
 
     return unsubscribe;
@@ -65,22 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
           const result = await signInWithPopup(getFirebaseAuth(), googleAuthProvider);
-          const currentUser = result.user;
-          const userRef = doc(getFirebaseDb(), "users", currentUser.uid);
-          const userSnapshot = await getDoc(userRef);
-
-          await setDoc(
-            userRef,
-            {
-              uid: currentUser.uid,
-              displayName: currentUser.displayName,
-              email: currentUser.email,
-              photoURL: currentUser.photoURL,
-              updatedAt: serverTimestamp(),
-              ...(userSnapshot.exists() ? {} : { createdAt: serverTimestamp() }),
-            },
-            { merge: true },
-          );
+          await upsertUserProfile(result.user);
         } catch (signInError) {
           const message =
             signInError instanceof Error

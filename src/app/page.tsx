@@ -1,10 +1,15 @@
 "use client";
 
+import { GroupDashboard } from "@/components/group-dashboard";
 import { useAuth } from "@/components/auth-provider";
 import { isFirebaseConfigured } from "@/lib/firebase";
 
 export default function Home() {
   const { user, loading, error, signInWithGoogle, logout } = useAuth();
+
+  if (!loading && user) {
+    return <GroupDashboard user={user} onLogout={logout} />;
+  }
 
   return (
     <main className="app-shell">
@@ -27,20 +32,7 @@ export default function Home() {
 
           {loading ? <p className="muted">認証状態を確認しています...</p> : null}
 
-          {!loading && user ? (
-            <div className="account">
-              <div>
-                <span className="label">ログイン中</span>
-                <strong>{user.displayName ?? "名前未設定"}</strong>
-                <span className="muted">{user.email}</span>
-              </div>
-              <button type="button" onClick={logout}>
-                ログアウト
-              </button>
-            </div>
-          ) : null}
-
-          {!loading && !user ? (
+          {!loading ? (
             <button type="button" className="primary-button" onClick={signInWithGoogle}>
               Googleでログイン
             </button>
