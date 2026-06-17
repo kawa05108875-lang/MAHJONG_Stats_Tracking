@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { User } from "firebase/auth";
+import { HandEntry } from "@/components/hand-entry";
 import {
   createMatch,
   getGroupMatches,
@@ -50,6 +51,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
 
   const selectedPlayers = useMemo(
     () =>
@@ -72,6 +74,10 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   );
 
   const selectedPlayerIds = seatPlayerIds.filter(Boolean);
+  const selectedMatch = useMemo(
+    () => matches.find((match) => match.matchId === selectedMatchId) ?? null,
+    [matches, selectedMatchId],
+  );
   const uniqueSelectedPlayerCount = new Set(selectedPlayerIds).size;
   const canCreateMatch =
     selectedPlayers.length === 4 &&
@@ -99,6 +105,13 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
       setPlayers(loadedPlayers);
       setMatches(loadedMatches);
+      setSelectedMatchId((currentMatchId) => {
+        if (currentMatchId && loadedMatches.some((match) => match.matchId === currentMatchId)) {
+          return currentMatchId;
+        }
+
+        return loadedMatches[0]?.matchId ?? null;
+      });
     } catch (loadError) {
       const message =
         loadError instanceof Error
@@ -186,6 +199,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       });
 
       setCreatedMatchId(matchId);
+      setSelectedMatchId(matchId);
       setSeatPlayerIds(["", "", "", ""]);
       await loadData();
     } catch (createError) {
@@ -365,6 +379,15 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
       {error ? <p className="error">{error}</p> : null}
 
+      {selectedMatch ? (
+        <HandEntry
+          key={selectedMatch.matchId}
+          match={selectedMatch}
+          user={user}
+          onSaved={loadData}
+        />
+      ) : null}
+
       <div className="match-list">
         <h4>最近の半荘</h4>
         {loading ? <p className="muted">半荘を読み込んでいます...</p> : null}
@@ -382,6 +405,9 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             <span className="status-pill linked">
               {match.status === "inputting" ? "入力中" : match.status}
             </span>
+            <button type="button" onClick={() => setSelectedMatchId(match.matchId)}>
+              局入力
+            </button>
           </div>
         ))}
       </div>

@@ -460,6 +460,55 @@ select:focus {
   gap: 4px;
 }
 
+.hand-entry-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.score-grid,
+.score-input-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.score-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.score-input-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.score-input-grid label,
+.check-list {
+  display: grid;
+  gap: 6px;
+}
+
+.score-input-grid label span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.segmented-control.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.segmented-control button.is-active {
+  border-color: var(--primary);
+  background: #eef9f6;
+  color: var(--primary-strong);
+}
+
 .floating-error {
   margin-top: 14px;
   padding: 12px 14px;
@@ -505,7 +554,8 @@ select:focus {
   }
 
   .seat-grid,
-  .rule-grid {
+  .rule-grid,
+  .score-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -515,6 +565,10 @@ select:focus {
   .metric-grid,
   .seat-grid,
   .rule-grid,
+  .score-grid,
+  .score-input-grid,
+  .segmented-control,
+  .segmented-control.compact,
   .player-row,
   .player-edit {
     grid-template-columns: 1fr;
