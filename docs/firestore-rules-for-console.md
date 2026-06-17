@@ -71,6 +71,20 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /matches/{matchId} {
+      allow read: if isGroupMember(resource.data.groupId);
+      allow create: if isGroupMember(request.resource.data.groupId)
+        && request.resource.data.matchId == matchId
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.status == "inputting";
+      allow update: if isGroupMember(resource.data.groupId)
+        && request.resource.data.matchId == resource.data.matchId
+        && request.resource.data.groupId == resource.data.groupId
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

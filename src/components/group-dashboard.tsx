@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { User } from "firebase/auth";
+import { MatchCreator } from "@/components/match-creator";
 import { PlayerManager } from "@/components/player-manager";
 import {
   createGroup,
@@ -207,12 +208,9 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
               </div>
 
               <PlayerManager groupId={selectedGroup.groupId} user={user} />
+              <MatchCreator key={selectedGroup.groupId} group={selectedGroup} user={user} />
 
               <div className="placeholder-grid">
-                <div>
-                  <h3>最近の半荘</h3>
-                  <p className="muted">フェーズ5で半荘作成後に表示します。</p>
-                </div>
                 <div>
                   <h3>ランキング概要</h3>
                   <p className="muted">フェーズ8で成績集計後に表示します。</p>

@@ -14,6 +14,14 @@ type PlayerManagerProps = {
   user: User;
 };
 
+function notifyPlayersChanged(groupId: string) {
+  window.dispatchEvent(
+    new CustomEvent("mahjong:players-changed", {
+      detail: { groupId },
+    }),
+  );
+}
+
 export function PlayerManager({ groupId, user }: PlayerManagerProps) {
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [name, setName] = useState("");
@@ -82,6 +90,7 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
       setName("");
       setLinkToMe(false);
       await loadPlayers();
+      notifyPlayersChanged(groupId);
     } catch (createError) {
       const message =
         createError instanceof Error
@@ -130,6 +139,7 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
       setEditingPlayerId(null);
       setEditingName("");
       await loadPlayers();
+      notifyPlayersChanged(groupId);
     } catch (updateError) {
       const message =
         updateError instanceof Error
