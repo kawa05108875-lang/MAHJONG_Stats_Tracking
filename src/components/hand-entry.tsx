@@ -33,6 +33,30 @@ function createEmptyScoreInputs(match: MatchSummary) {
   return Object.fromEntries(match.players.map((player) => [player.playerId, "0"]));
 }
 
+function calculateDrawScoreDeltas(
+  match: MatchSummary,
+  tenpaiPlayerIds: string[],
+  riichiPlayerIds: string[],
+) {
+  const tenpaiCount = tenpaiPlayerIds.length;
+  const notenCount = match.players.length - tenpaiCount;
+
+  return match.players.map((player) => {
+    const isTenpai = tenpaiPlayerIds.includes(player.playerId);
+    const riichiDelta = riichiPlayerIds.includes(player.playerId) ? -1000 : 0;
+    let notenPenaltyDelta = 0;
+
+    if (tenpaiCount > 0 && notenCount > 0) {
+      notenPenaltyDelta = isTenpai ? 3000 / tenpaiCount : -3000 / notenCount;
+    }
+
+    return {
+      playerId: player.playerId,
+      delta: notenPenaltyDelta + riichiDelta,
+    };
+  });
+}
+
 function handTypeLabel(handType: HandType, winType?: WinType) {
   if (handType === "win") {
     return winType === "tsumo" ? "ツモ" : "ロン";
@@ -56,19 +80,23 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const [scoreInputs, setScoreInputs] = useState<Record<string, string>>(() =>
     createEmptyScoreInputs(match),
   );
-  const [memo, setMemo] = useState("");
   const [drawRiichiSticksConfirmed, setDrawRiichiSticksConfirmed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const scoreDeltas = useMemo<ScoreDelta[]>(
-    () =>
-      match.players.map((player) => ({
+    () => {
+      if (handType === "draw") {
+        return calculateDrawScoreDeltas(match, tenpaiPlayerIds, riichiPlayerIds);
+      }
+
+      return match.players.map((player) => ({
         playerId: player.playerId,
         delta: parseScore(scoreInputs[player.playerId] ?? "0"),
-      })),
-    [match.players, scoreInputs],
+      }));
+    },
+    [handType, match, riichiPlayerIds, scoreInputs, tenpaiPlayerIds],
   );
   const scoreDeltaTotal = scoreDeltas.reduce(
     (total, scoreDelta) => total + scoreDelta.delta,
@@ -128,7 +156,6 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setLoserPlayerId("");
     setRiichiPlayerIds([]);
     setTenpaiPlayerIds([]);
-    setMemo("");
     setDrawRiichiSticksConfirmed(false);
   }
 
@@ -172,7 +199,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         loserPlayerId: handType === "win" && winType === "ron" ? loserPlayerId : undefined,
         tenpaiPlayerIds: handType === "draw" ? tenpaiPlayerIds : undefined,
         scoreDeltas,
-        memo: memo.trim() || null,
+        memo: null,
         nextRound: getNextRound(match.currentRound),
         nextHonba: 0,
         nextRiichiSticks,
@@ -293,9 +320,10 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 <input
                   type="checkbox"
                   checked={tenpaiPlayerIds.includes(player.playerId)}
-                  onChange={() =>
-                    togglePlayerId(player.playerId, tenpaiPlayerIds, setTenpaiPlayerIds)
-                  }
+                  onChange={() => {
+                    togglePlayerId(player.playerId, tenpaiPlayerIds, setTenpaiPlayerIds);
+                    setDrawRiichiSticksConfirmed(false);
+                  }}
                 />
                 <span>{player.name}</span>
               </label>
@@ -322,7 +350,11 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
 
         {handType === "draw" ? (
           <div className="notice">
-            <strong>供託確認</strong>
+            <strong>流局精算確認</strong>
+            <span>
+              聴牌者 {tenpaiPlayerIds.length}人 / ノーテン{" "}
+              {match.players.length - tenpaiPlayerIds.length}人
+            </span>
             <span>
               現在供託 {match.currentRiichiSticks}本 + 今回リーチ{" "}
               {riichiPlayerIds.length}本 = 次局供託 {nextRiichiSticks}本
@@ -346,7 +378,16 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               <span>{player.name} 増減</span>
               <input
                 inputMode="numeric"
-                value={scoreInputs[player.playerId] ?? "0"}
+                value={
+                  handType === "draw"
+                    ? String(
+                        scoreDeltas.find(
+                          (scoreDelta) => scoreDelta.playerId === player.playerId,
+                        )?.delta ?? 0,
+                      )
+                    : scoreInputs[player.playerId] ?? "0"
+                }
+                readOnly={handType === "draw"}
                 onChange={(event) =>
                   setScoreInputs((current) => ({
                     ...current,
@@ -363,13 +404,10 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           }
         >
           点数増減合計: {scoreDeltaTotal.toLocaleString()}
-          {handType === "draw" ? " / 流局時はリーチ棒が供託になるため0以外も保存できます" : ""}
+          {handType === "draw"
+            ? " / ノーテン罰符とリーチ棒を自動計算しています"
+            : ""}
         </p>
-
-        <label>
-          <span className="label">メモ</span>
-          <input value={memo} onChange={(event) => setMemo(event.target.value)} />
-        </label>
 
         <button type="submit" className="primary-button" disabled={saving}>
           局結果を保存
@@ -394,7 +432,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               <span className="muted">
                 {hand.handType === "win"
                   ? `和了: ${playerName(match, hand.winnerPlayerId)} / 放銃: ${playerName(match, hand.loserPlayerId)}`
-                  : hand.memo ?? "メモなし"}
+                  : hand.handType === "draw"
+                    ? `聴牌: ${(hand.tenpaiPlayerIds ?? []).map((playerId) => playerName(match, playerId)).join(" / ") || "-"}`
+                    : "罰符"}
               </span>
             </div>
           </div>
