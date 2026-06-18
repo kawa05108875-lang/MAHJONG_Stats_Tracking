@@ -1,5 +1,6 @@
 import {
   collection,
+  doc,
   getDocs,
   query,
   where,
@@ -32,21 +33,26 @@ async function deleteSnapshotsInBatches(
   return deletedCount;
 }
 
-export async function resetGroupMatchData(groupId: string) {
+export async function deleteMatchData(params: {
+  groupId: string;
+  matchId: string;
+}) {
   const db = getFirebaseDb();
-  const [handSnapshots, matchSnapshots, statsSnapshots] = await Promise.all([
-    getDocs(query(collection(db, "hands"), where("groupId", "==", groupId))),
-    getDocs(query(collection(db, "matches"), where("groupId", "==", groupId))),
-    getDocs(query(collection(db, "playerStats"), where("groupId", "==", groupId))),
-  ]);
-
+  const handSnapshots = await getDocs(
+    query(
+      collection(db, "hands"),
+      where("groupId", "==", params.groupId),
+      where("matchId", "==", params.matchId),
+    ),
+  );
   const deletedHands = await deleteSnapshotsInBatches(handSnapshots.docs);
-  const deletedMatches = await deleteSnapshotsInBatches(matchSnapshots.docs);
-  const deletedStats = await deleteSnapshotsInBatches(statsSnapshots.docs);
+  const batch = writeBatch(db);
+
+  batch.delete(doc(db, "matches", params.matchId));
+  await batch.commit();
 
   return {
     deletedHands,
-    deletedMatches,
-    deletedStats,
+    deletedMatches: 1,
   };
 }

@@ -9,7 +9,6 @@ import {
   getJoinedGroups,
   type GroupSummary,
 } from "@/lib/firestore/groups";
-import { resetGroupMatchData } from "@/lib/firestore/maintenance";
 
 type GroupDashboardProps = {
   user: User;
@@ -28,8 +27,6 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   const [groupName, setGroupName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [matchDataVersion, setMatchDataVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const selectedGroup = useMemo(
@@ -110,44 +107,6 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
       );
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleResetMatchData() {
-    if (!selectedGroup) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "このグループの半荘、局履歴、成績を削除します。グループとプレイヤーは残ります。実行しますか？",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setResetting(true);
-    setError(null);
-
-    try {
-      const result = await resetGroupMatchData(selectedGroup.groupId);
-      setMatchDataVersion((current) => current + 1);
-      setError(
-        `削除しました: 半荘 ${result.deletedMatches}件 / 局履歴 ${result.deletedHands}件 / 成績 ${result.deletedStats}件`,
-      );
-    } catch (resetError) {
-      const message =
-        resetError instanceof Error
-          ? resetError.message
-          : "半荘データの削除に失敗しました。";
-
-      setError(
-        message.includes("permission")
-          ? "半荘データを削除できませんでした。Firestore Security Rulesを確認してください。"
-          : message,
-      );
-    } finally {
-      setResetting(false);
     }
   }
 
@@ -249,27 +208,7 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
               </div>
 
               <PlayerManager groupId={selectedGroup.groupId} user={user} />
-              <div className="danger-zone">
-                <div>
-                  <h3>対局データの初期化</h3>
-                  <p className="muted">
-                    半荘、局履歴、成績だけを削除します。グループとプレイヤーは残ります。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="danger-button"
-                  onClick={handleResetMatchData}
-                  disabled={resetting}
-                >
-                  {resetting ? "削除中..." : "半荘データを削除"}
-                </button>
-              </div>
-              <MatchCreator
-                key={`${selectedGroup.groupId}-${matchDataVersion}`}
-                group={selectedGroup}
-                user={user}
-              />
+              <MatchCreator key={selectedGroup.groupId} group={selectedGroup} user={user} />
 
               <div className="placeholder-grid">
                 <div>
