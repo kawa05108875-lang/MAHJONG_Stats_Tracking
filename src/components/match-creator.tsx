@@ -10,7 +10,13 @@ import {
 } from "@/lib/firestore/matches";
 import { getGroupPlayers, type PlayerSummary } from "@/lib/firestore/players";
 import type { GroupSummary } from "@/lib/firestore/groups";
-import type { MatchFinalResult, MatchPlayer, MatchRule, SeatIndex } from "@/types";
+import type {
+  DealerRepeatRule,
+  MatchFinalResult,
+  MatchPlayer,
+  MatchRule,
+  SeatIndex,
+} from "@/types";
 
 type MatchCreatorProps = {
   group: GroupSummary;
@@ -18,6 +24,7 @@ type MatchCreatorProps = {
 };
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
+const DEFAULT_DEALER_REPEAT_RULE: DealerRepeatRule = "dealer-win-or-tenpai";
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -38,6 +45,7 @@ function createRuleForm(rule: MatchRule) {
     umaThird: String(rule.uma.third),
     umaFourth: String(rule.uma.fourth),
     bankruptcyEnabled: rule.bankruptcyEnabled,
+    dealerRepeatRule: rule.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
   };
 }
 
@@ -212,6 +220,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       },
       bankruptcyEnabled: ruleForm.bankruptcyEnabled,
       tieBreak: group.defaultRule.tieBreak,
+      dealerRepeatRule: ruleForm.dealerRepeatRule,
     };
   }
 
@@ -403,6 +412,23 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             }
           />
           <span>トビ終了あり</span>
+        </label>
+
+        <label className="select-field">
+          <span>連荘ルール</span>
+          <select
+            value={ruleForm.dealerRepeatRule}
+            onChange={(event) =>
+              setRuleForm((current) => ({
+                ...current,
+                dealerRepeatRule: event.target.value as DealerRepeatRule,
+              }))
+            }
+          >
+            <option value="dealer-win-or-tenpai">親和了・親テンパイ流局で連荘</option>
+            <option value="dealer-win">親和了のみ連荘</option>
+            <option value="always">流局は親テンパイに関係なく連荘</option>
+          </select>
         </label>
 
         <button type="submit" className="primary-button" disabled={saving || !canCreateMatch}>

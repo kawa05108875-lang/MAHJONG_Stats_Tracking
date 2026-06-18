@@ -142,14 +142,20 @@ function getNextHandProgression(params: {
   tenpaiPlayerIds: string[];
 }) {
   const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
+  const dealerRepeatRule =
+    params.match.rule.dealerRepeatRule ?? "dealer-win-or-tenpai";
   const dealerWon =
     params.handType === "win" && params.winnerPlayerId === currentDealerPlayerId;
   const dealerTenpaiDraw =
     params.handType === "draw" && currentDealerPlayerId
       ? params.tenpaiPlayerIds.includes(currentDealerPlayerId)
       : false;
+  const drawRepeats =
+    params.handType === "draw" &&
+    (dealerRepeatRule === "always" ||
+      (dealerRepeatRule === "dealer-win-or-tenpai" && dealerTenpaiDraw));
 
-  if (dealerWon || dealerTenpaiDraw) {
+  if (dealerWon || drawRepeats) {
     return {
       nextRound: params.match.currentRound,
       nextHonba: params.match.currentHonba + 1,
