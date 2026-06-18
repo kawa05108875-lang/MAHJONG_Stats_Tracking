@@ -4,11 +4,12 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
-import type { Match, MatchPlayer, MatchRule } from "@/types";
+import type { Match, MatchFinalResult, MatchPlayer, MatchRule } from "@/types";
 
 export type MatchSummary = Pick<
   Match,
@@ -22,6 +23,7 @@ export type MatchSummary = Pick<
   | "currentRound"
   | "currentHonba"
   | "currentRiichiSticks"
+  | "finalResults"
 >;
 
 export async function createMatch(params: {
@@ -86,7 +88,24 @@ export async function getGroupMatches(groupId: string): Promise<MatchSummary[]> 
         currentRound: match.currentRound,
         currentHonba: match.currentHonba,
         currentRiichiSticks: match.currentRiichiSticks,
+        finalResults: match.finalResults,
       } satisfies MatchSummary;
     })
     .sort((left, right) => right.date.localeCompare(left.date));
+}
+
+export async function finishMatch(params: {
+  matchId: string;
+  finalResults: MatchFinalResult[];
+  uid: string;
+}) {
+  const db = getFirebaseDb();
+  const matchRef = doc(db, "matches", params.matchId);
+
+  await updateDoc(matchRef, {
+    status: "finished",
+    finalResults: params.finalResults,
+    updatedBy: params.uid,
+    updatedAt: serverTimestamp(),
+  });
 }

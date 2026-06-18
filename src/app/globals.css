@@ -475,6 +475,84 @@ select:focus {
   gap: 4px;
 }
 
+.hand-entry-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.result-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.result-table {
+  display: grid;
+  gap: 8px;
+}
+
+.result-row {
+  display: grid;
+  grid-template-columns: 48px minmax(96px, 1fr) 96px minmax(160px, 1.4fr) 96px;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.result-row span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.score-grid,
+.score-input-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.score-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.score-input-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.score-input-grid label,
+.check-list {
+  display: grid;
+  gap: 6px;
+}
+
+.score-input-grid label span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.segmented-control.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.segmented-control button.is-active {
+  border-color: var(--primary);
+  background: #eef9f6;
+  color: var(--primary-strong);
+}
+
 .floating-error {
   margin-top: 14px;
   padding: 12px 14px;
@@ -520,7 +598,8 @@ select:focus {
   }
 
   .seat-grid,
-  .rule-grid {
+  .rule-grid,
+  .score-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -530,6 +609,11 @@ select:focus {
   .metric-grid,
   .seat-grid,
   .rule-grid,
+  .score-grid,
+  .score-input-grid,
+  .segmented-control,
+  .segmented-control.compact,
+  .result-row,
   .player-row,
   .player-edit {
     grid-template-columns: 1fr;
