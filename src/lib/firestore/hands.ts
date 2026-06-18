@@ -65,10 +65,17 @@ const ROUND_ORDER: MatchRound[] = [
   { wind: "south", number: 2 },
   { wind: "south", number: 3 },
   { wind: "south", number: 4 },
+  { wind: "west", number: 1 },
+  { wind: "west", number: 2 },
+  { wind: "west", number: 3 },
+  { wind: "west", number: 4 },
 ];
 
 export function formatRound(round: MatchRound) {
-  return `${round.wind === "east" ? "東" : "南"}${round.number}局`;
+  const windLabel =
+    round.wind === "east" ? "東" : round.wind === "south" ? "南" : "西";
+
+  return `${windLabel}${round.number}局`;
 }
 
 export function getNextRound(round: MatchRound): MatchRound {

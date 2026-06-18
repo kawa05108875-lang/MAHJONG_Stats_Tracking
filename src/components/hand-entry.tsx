@@ -16,7 +16,7 @@ import {
   hasBankruptPlayer,
 } from "@/lib/mahjong";
 import { recalculateGroupPlayerStats } from "@/lib/firestore/stats";
-import type { HandType, ScoreDelta, WinType } from "@/types";
+import type { HandType, MatchFinalResult, MatchRound, ScoreDelta, WinType } from "@/types";
 
 type HandEntryProps = {
   match: MatchSummary;
@@ -86,7 +86,8 @@ function calculateDrawScoreDeltas(
 }
 
 function getRoundIndex(match: MatchSummary) {
-  const windOffset = match.currentRound.wind === "south" ? 4 : 0;
+  const windOffset =
+    match.currentRound.wind === "west" ? 8 : match.currentRound.wind === "south" ? 4 : 0;
 
   return windOffset + match.currentRound.number - 1;
 }
@@ -118,6 +119,74 @@ function getCurrentSeatPlayers(match: MatchSummary) {
       getCurrentHouseIndex(match, left.seatIndex) -
       getCurrentHouseIndex(match, right.seatIndex),
   );
+}
+
+function isLastScheduledRound(round: MatchRound, westRoundEnabled: boolean) {
+  const lastWind = westRoundEnabled ? "west" : "south";
+
+  return round.wind === lastWind && round.number === 4;
+}
+
+function hasReturnScore(results: MatchFinalResult[], returnScore: number) {
+  return results.some((result) => result.finalScore >= returnScore);
+}
+
+function playerIsTop(results: MatchFinalResult[], playerId: string | undefined) {
+  return results.some((result) => result.playerId === playerId && result.rank === 1);
+}
+
+function shouldFinishAfterHand(params: {
+  match: MatchSummary;
+  handType: HandType;
+  winnerPlayerId: string;
+  nextRound: MatchRound;
+  finalResults: MatchFinalResult[];
+}) {
+  const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
+  const westRoundEnabled = params.match.rule.westRoundEnabled ?? false;
+  const agariYameEnabled = params.match.rule.agariYameEnabled ?? true;
+  const currentRoundIsSouthLast =
+    params.match.currentRound.wind === "south" && params.match.currentRound.number === 4;
+  const currentRoundIsFinalScheduledRound = isLastScheduledRound(
+    params.match.currentRound,
+    westRoundEnabled,
+  );
+
+  if (agariYameEnabled && currentRoundIsFinalScheduledRound) {
+    const dealerWon =
+      params.handType === "win" && params.winnerPlayerId === currentDealerPlayerId;
+
+    if (dealerWon && playerIsTop(params.finalResults, currentDealerPlayerId)) {
+      return true;
+    }
+  }
+
+  if (
+    currentRoundIsSouthLast &&
+    westRoundEnabled &&
+    !hasReturnScore(params.finalResults, params.match.rule.returnScore)
+  ) {
+    return false;
+  }
+
+  if (currentRoundIsSouthLast) {
+    const repeatsSouthLast =
+      params.nextRound.wind === params.match.currentRound.wind &&
+      params.nextRound.number === params.match.currentRound.number;
+
+    return !repeatsSouthLast;
+  }
+
+  if (params.match.currentRound.wind === "west") {
+    return (
+      hasReturnScore(params.finalResults, params.match.rule.returnScore) ||
+      (params.match.currentRound.number === 4 &&
+        params.nextRound.wind === params.match.currentRound.wind &&
+        params.nextRound.number === params.match.currentRound.number)
+    );
+  }
+
+  return false;
 }
 
 function calculateWinScoreDeltas(params: {
@@ -423,15 +492,27 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         tenpaiPlayerIds,
       });
       const nextScores = applyScoreDeltas(currentScores, scoreDeltas);
+      const calculatedFinalResults = calculateMatchFinalResults(
+        match.players,
+        nextScores,
+        match.dealerPlayerId,
+        match.rule,
+      );
       const finalResultsByBankruptcy =
         match.rule.bankruptcyEnabled && hasBankruptPlayer(nextScores)
-          ? calculateMatchFinalResults(
-              match.players,
-              nextScores,
-              match.dealerPlayerId,
-              match.rule,
-            )
+          ? calculatedFinalResults
           : undefined;
+      const finalResultsByRule =
+        finalResultsByBankruptcy ??
+        (shouldFinishAfterHand({
+          match,
+          handType,
+          winnerPlayerId,
+          nextRound: nextProgression.nextRound,
+          finalResults: calculatedFinalResults,
+        })
+          ? calculatedFinalResults
+          : undefined);
 
       await createHandAndAdvanceMatch({
         matchId: match.matchId,
@@ -450,7 +531,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         nextRound: nextProgression.nextRound,
         nextHonba: nextProgression.nextHonba,
         nextRiichiSticks,
-        finalResults: finalResultsByBankruptcy,
+        finalResults: finalResultsByRule,
         uid: user.uid,
       });
 

@@ -35,6 +35,8 @@ service cloud.firestore {
           "bankruptcyEnabled",
           "tieBreak",
           "dealerRepeatRule",
+          "agariYameEnabled",
+          "westRoundEnabled",
         ])
         && rule.keys().hasAll([
           "initialScore",
@@ -57,14 +59,16 @@ service cloud.firestore {
         && (
           !("dealerRepeatRule" in rule)
           || rule.dealerRepeatRule in ["dealer-win", "dealer-win-or-tenpai", "always"]
-        );
+        )
+        && (!("agariYameEnabled" in rule) || rule.agariYameEnabled is bool)
+        && (!("westRoundEnabled" in rule) || rule.westRoundEnabled is bool);
     }
 
     function isValidRound(round) {
       return round is map
         && round.keys().hasOnly(["wind", "number"])
         && round.keys().hasAll(["wind", "number"])
-        && round.wind in ["east", "south"]
+        && round.wind in ["east", "south", "west"]
         && round.number in [1, 2, 3, 4];
     }
 
