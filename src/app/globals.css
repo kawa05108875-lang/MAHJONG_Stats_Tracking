@@ -395,6 +395,21 @@ select:focus {
   border-color: var(--danger);
 }
 
+.danger-zone {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(180, 35, 24, 0.22);
+  border-radius: 8px;
+  background: #fff8f6;
+}
+
+.danger-zone h3 {
+  font-size: 1rem;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
