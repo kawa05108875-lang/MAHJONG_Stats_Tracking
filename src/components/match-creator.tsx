@@ -10,7 +10,7 @@ import {
 } from "@/lib/firestore/matches";
 import { getGroupPlayers, type PlayerSummary } from "@/lib/firestore/players";
 import type { GroupSummary } from "@/lib/firestore/groups";
-import type { MatchPlayer, MatchRule, SeatIndex } from "@/types";
+import type { MatchFinalResult, MatchPlayer, MatchRule, SeatIndex } from "@/types";
 
 type MatchCreatorProps = {
   group: GroupSummary;
@@ -39,6 +39,45 @@ function createRuleForm(rule: MatchRule) {
     umaFourth: String(rule.uma.fourth),
     bankruptcyEnabled: rule.bankruptcyEnabled,
   };
+}
+
+function statusLabel(status: MatchSummary["status"]) {
+  if (status === "inputting") {
+    return "入力中";
+  }
+
+  if (status === "finished") {
+    return "終了";
+  }
+
+  return "キャンセル";
+}
+
+function MatchResultPanel({ results }: { results: MatchFinalResult[] }) {
+  return (
+    <section className="result-panel">
+      <div className="section-header">
+        <div>
+          <p className="eyebrow">Final Results</p>
+          <h3>半荘結果</h3>
+        </div>
+      </div>
+      <div className="result-table">
+        {results.map((result) => (
+          <div key={result.playerId} className="result-row">
+            <strong>{result.rank}位</strong>
+            <span>{result.name}</span>
+            <span>{result.finalScore.toLocaleString()}点</span>
+            <span>
+              素点 {result.rawPoint.toFixed(1)} / ウマ {result.uma.toFixed(1)} / オカ{" "}
+              {result.oka.toFixed(1)}
+            </span>
+            <strong>{result.totalPoint.toFixed(1)}pt</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export function MatchCreator({ group, user }: MatchCreatorProps) {
@@ -379,7 +418,9 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
       {error ? <p className="error">{error}</p> : null}
 
-      {selectedMatch ? (
+      {selectedMatch?.status === "finished" && selectedMatch.finalResults ? (
+        <MatchResultPanel results={selectedMatch.finalResults} />
+      ) : selectedMatch ? (
         <HandEntry
           key={selectedMatch.matchId}
           match={selectedMatch}
@@ -403,10 +444,10 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
               </span>
             </div>
             <span className="status-pill linked">
-              {match.status === "inputting" ? "入力中" : match.status}
+              {statusLabel(match.status)}
             </span>
             <button type="button" onClick={() => setSelectedMatchId(match.matchId)}>
-              局入力
+              {match.status === "finished" ? "結果" : "局入力"}
             </button>
           </div>
         ))}

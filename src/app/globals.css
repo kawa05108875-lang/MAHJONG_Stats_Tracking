@@ -467,6 +467,35 @@ select:focus {
   border-top: 1px solid var(--line);
 }
 
+.result-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.result-table {
+  display: grid;
+  gap: 8px;
+}
+
+.result-row {
+  display: grid;
+  grid-template-columns: 48px minmax(96px, 1fr) 96px minmax(160px, 1.4fr) 96px;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.result-row span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .score-grid,
 .score-input-grid {
   display: grid;
@@ -569,6 +598,7 @@ select:focus {
   .score-input-grid,
   .segmented-control,
   .segmented-control.compact,
+  .result-row,
   .player-row,
   .player-edit {
     grid-template-columns: 1fr;

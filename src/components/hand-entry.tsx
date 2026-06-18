@@ -9,8 +9,8 @@ import {
   getNextRound,
   type HandSummary,
 } from "@/lib/firestore/hands";
-import type { MatchSummary } from "@/lib/firestore/matches";
-import { calculateCurrentScores } from "@/lib/mahjong";
+import { finishMatch, type MatchSummary } from "@/lib/firestore/matches";
+import { calculateCurrentScores, calculateMatchFinalResults } from "@/lib/mahjong";
 import type { HandType, ScoreDelta, WinType } from "@/types";
 
 type HandEntryProps = {
@@ -164,6 +164,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const [drawRiichiSticksConfirmed, setDrawRiichiSticksConfirmed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const scoreDeltas = useMemo<ScoreDelta[]>(
@@ -219,6 +220,16 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const currentScores = useMemo(
     () => calculateCurrentScores(match.players, hands, match.rule.initialScore),
     [hands, match.players, match.rule.initialScore],
+  );
+  const finalResults = useMemo(
+    () =>
+      calculateMatchFinalResults(
+        match.players,
+        currentScores,
+        match.dealerPlayerId,
+        match.rule,
+      ),
+    [currentScores, match.dealerPlayerId, match.players, match.rule],
   );
 
   const loadHands = useCallback(async () => {
@@ -359,6 +370,42 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     }
   }
 
+  async function handleFinishMatch() {
+    if (hands.length === 0) {
+      setError("少なくとも1局は入力してから半荘を終了してください。");
+      return;
+    }
+
+    if (match.currentRiichiSticks > 0) {
+      setError("供託が残っています。最後の局結果を確認してから半荘を終了してください。");
+      return;
+    }
+
+    setFinishing(true);
+    setError(null);
+
+    try {
+      await finishMatch({
+        matchId: match.matchId,
+        finalResults,
+        uid: user.uid,
+      });
+
+      await onSaved();
+    } catch (finishError) {
+      const message =
+        finishError instanceof Error ? finishError.message : "半荘結果の保存に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "半荘結果を保存できませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setFinishing(false);
+    }
+  }
+
   return (
     <section className="hand-entry-panel">
       <div className="section-header">
@@ -380,6 +427,35 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             <strong>{currentScores[player.playerId]?.toLocaleString() ?? "-"}</strong>
           </div>
         ))}
+      </div>
+
+      <div className="result-panel">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Final Preview</p>
+            <h4>半荘結果プレビュー</h4>
+          </div>
+          <button type="button" onClick={handleFinishMatch} disabled={finishing || loading}>
+            {finishing ? "保存中..." : "半荘を終了"}
+          </button>
+        </div>
+        <div className="result-table">
+          {finalResults.map((result) => (
+            <div key={result.playerId} className="result-row">
+              <strong>{result.rank}位</strong>
+              <span>{result.name}</span>
+              <span>{result.finalScore.toLocaleString()}点</span>
+              <span>
+                {result.rawPoint.toFixed(1)} + {result.uma.toFixed(1)} +{" "}
+                {result.oka.toFixed(1)}
+              </span>
+              <strong>{result.totalPoint.toFixed(1)}pt</strong>
+            </div>
+          ))}
+        </div>
+        {match.currentRiichiSticks > 0 ? (
+          <p className="error">供託が{match.currentRiichiSticks}本残っています。</p>
+        ) : null}
       </div>
 
       <form className="match-form" onSubmit={handleSubmit}>
