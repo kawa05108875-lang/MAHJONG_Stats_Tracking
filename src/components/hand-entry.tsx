@@ -10,7 +10,7 @@ import {
   type HandSummary,
 } from "@/lib/firestore/hands";
 import type { MatchSummary } from "@/lib/firestore/matches";
-import { calculateCurrentScores, isZeroSumScoreDelta } from "@/lib/mahjong";
+import { calculateCurrentScores } from "@/lib/mahjong";
 import type { HandType, ScoreDelta, WinType } from "@/types";
 
 type HandEntryProps = {
@@ -57,6 +57,84 @@ function calculateDrawScoreDeltas(
   });
 }
 
+function getRoundIndex(match: MatchSummary) {
+  const windOffset = match.currentRound.wind === "south" ? 4 : 0;
+
+  return windOffset + match.currentRound.number - 1;
+}
+
+function getCurrentDealerPlayerId(match: MatchSummary) {
+  const eastSeatIndex =
+    match.players.find((player) => player.playerId === match.dealerPlayerId)?.seatIndex ?? 0;
+  const dealerSeatIndex = (eastSeatIndex + getRoundIndex(match)) % 4;
+
+  return match.players.find((player) => player.seatIndex === dealerSeatIndex)?.playerId;
+}
+
+function calculateWinScoreDeltas(params: {
+  match: MatchSummary;
+  winType: WinType;
+  winnerPlayerId: string;
+  loserPlayerId: string;
+  riichiPlayerIds: string[];
+  ronPoint: number;
+  dealerTsumoPoint: number;
+  childTsumoPoint: number;
+}) {
+  const riichiStickPoint =
+    (params.match.currentRiichiSticks + params.riichiPlayerIds.length) * 1000;
+  const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
+
+  return params.match.players.map((player) => {
+    const isWinner = player.playerId === params.winnerPlayerId;
+    const isLoser = player.playerId === params.loserPlayerId;
+    const isRiichi = params.riichiPlayerIds.includes(player.playerId);
+    const riichiDelta = isRiichi ? -1000 : 0;
+    let handDelta = 0;
+
+    if (params.winType === "ron") {
+      if (isWinner) {
+        handDelta = params.ronPoint + riichiStickPoint;
+      } else if (isLoser) {
+        handDelta = -params.ronPoint;
+      }
+    } else {
+      const winnerIsDealer = params.winnerPlayerId === currentDealerPlayerId;
+
+      if (isWinner) {
+        const paymentTotal = params.match.players
+          .filter((candidate) => candidate.playerId !== params.winnerPlayerId)
+          .reduce((total, candidate) => {
+            if (winnerIsDealer) {
+              return total + params.dealerTsumoPoint;
+            }
+
+            return (
+              total +
+              (candidate.playerId === currentDealerPlayerId
+                ? params.dealerTsumoPoint
+                : params.childTsumoPoint)
+            );
+          }, 0);
+
+        handDelta = paymentTotal + riichiStickPoint;
+      } else if (winnerIsDealer) {
+        handDelta = -params.dealerTsumoPoint;
+      } else {
+        handDelta =
+          player.playerId === currentDealerPlayerId
+            ? -params.dealerTsumoPoint
+            : -params.childTsumoPoint;
+      }
+    }
+
+    return {
+      playerId: player.playerId,
+      delta: handDelta + riichiDelta,
+    };
+  });
+}
+
 function handTypeLabel(handType: HandType, winType?: WinType) {
   if (handType === "win") {
     return winType === "tsumo" ? "ツモ" : "ロン";
@@ -75,6 +153,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const [winType, setWinType] = useState<WinType>("ron");
   const [winnerPlayerId, setWinnerPlayerId] = useState("");
   const [loserPlayerId, setLoserPlayerId] = useState("");
+  const [ronPoint, setRonPoint] = useState("");
+  const [dealerTsumoPoint, setDealerTsumoPoint] = useState("");
+  const [childTsumoPoint, setChildTsumoPoint] = useState("");
   const [riichiPlayerIds, setRiichiPlayerIds] = useState<string[]>([]);
   const [tenpaiPlayerIds, setTenpaiPlayerIds] = useState<string[]>([]);
   const [scoreInputs, setScoreInputs] = useState<Record<string, string>>(() =>
@@ -87,6 +168,19 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
 
   const scoreDeltas = useMemo<ScoreDelta[]>(
     () => {
+      if (handType === "win") {
+        return calculateWinScoreDeltas({
+          match,
+          winType,
+          winnerPlayerId,
+          loserPlayerId,
+          riichiPlayerIds,
+          ronPoint: parseScore(ronPoint),
+          dealerTsumoPoint: parseScore(dealerTsumoPoint),
+          childTsumoPoint: parseScore(childTsumoPoint),
+        });
+      }
+
       if (handType === "draw") {
         return calculateDrawScoreDeltas(match, tenpaiPlayerIds, riichiPlayerIds);
       }
@@ -96,15 +190,32 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         delta: parseScore(scoreInputs[player.playerId] ?? "0"),
       }));
     },
-    [handType, match, riichiPlayerIds, scoreInputs, tenpaiPlayerIds],
+    [
+      childTsumoPoint,
+      dealerTsumoPoint,
+      handType,
+      loserPlayerId,
+      match,
+      riichiPlayerIds,
+      ronPoint,
+      scoreInputs,
+      tenpaiPlayerIds,
+      winType,
+      winnerPlayerId,
+    ],
   );
   const scoreDeltaTotal = scoreDeltas.reduce(
     (total, scoreDelta) => total + scoreDelta.delta,
     0,
   );
-  const requiresZeroSumScoreDelta = handType !== "draw";
+  const expectedScoreDeltaTotal =
+    handType === "win" ? match.currentRiichiSticks * 1000 : 0;
+  const scoreDeltaTotalIsValid =
+    handType === "draw" || scoreDeltaTotal === expectedScoreDeltaTotal;
   const nextRiichiSticks =
     handType === "draw" ? match.currentRiichiSticks + riichiPlayerIds.length : 0;
+  const currentDealerPlayerId = getCurrentDealerPlayerId(match);
+  const winnerIsDealer = winnerPlayerId === currentDealerPlayerId;
   const currentScores = useMemo(
     () => calculateCurrentScores(match.players, hands, match.rule.initialScore),
     [hands, match.players, match.rule.initialScore],
@@ -154,6 +265,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setScoreInputs(createEmptyScoreInputs(match));
     setWinnerPlayerId("");
     setLoserPlayerId("");
+    setRonPoint("");
+    setDealerTsumoPoint("");
+    setChildTsumoPoint("");
     setRiichiPlayerIds([]);
     setTenpaiPlayerIds([]);
     setDrawRiichiSticksConfirmed(false);
@@ -162,8 +276,12 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (requiresZeroSumScoreDelta && !isZeroSumScoreDelta(scoreDeltas)) {
-      setError("点数増減の合計が0になるように入力してください。");
+    if (!scoreDeltaTotalIsValid) {
+      setError(
+        handType === "win"
+          ? "点数増減の合計が現在供託の回収分と一致するように入力してください。"
+          : "点数増減の合計が0になるように入力してください。",
+      );
       return;
     }
 
@@ -174,6 +292,24 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
 
     if (handType === "win" && winType === "ron" && !loserPlayerId) {
       setError("放銃者を選択してください。");
+      return;
+    }
+
+    if (handType === "win" && winType === "ron" && parseScore(ronPoint) <= 0) {
+      setError("ロンの支払い点を入力してください。");
+      return;
+    }
+
+    if (
+      handType === "win" &&
+      winType === "tsumo" &&
+      (parseScore(dealerTsumoPoint) <= 0 || (!winnerIsDealer && parseScore(childTsumoPoint) <= 0))
+    ) {
+      setError(
+        winnerIsDealer
+          ? "親ツモの各自支払い点を入力してください。"
+          : "子ツモの親支払い点と子支払い点を入力してください。",
+      );
       return;
     }
 
@@ -271,7 +407,12 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                   key={type}
                   type="button"
                   className={winType === type ? "is-active" : ""}
-                  onClick={() => setWinType(type)}
+                  onClick={() => {
+                    setWinType(type);
+                    setRonPoint("");
+                    setDealerTsumoPoint("");
+                    setChildTsumoPoint("");
+                  }}
                 >
                   {type === "ron" ? "ロン" : "ツモ"}
                 </button>
@@ -282,7 +423,12 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               <span>和了者</span>
               <select
                 value={winnerPlayerId}
-                onChange={(event) => setWinnerPlayerId(event.target.value)}
+                onChange={(event) => {
+                  setWinnerPlayerId(event.target.value);
+                  setRonPoint("");
+                  setDealerTsumoPoint("");
+                  setChildTsumoPoint("");
+                }}
               >
                 <option value="">選択</option>
                 {match.players.map((player) => (
@@ -294,21 +440,75 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             </label>
 
             {winType === "ron" ? (
-              <label className="select-field">
-                <span>放銃者</span>
-                <select
-                  value={loserPlayerId}
-                  onChange={(event) => setLoserPlayerId(event.target.value)}
-                >
-                  <option value="">選択</option>
-                  {match.players.map((player) => (
-                    <option key={player.playerId} value={player.playerId}>
-                      {player.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <>
+                <label className="select-field">
+                  <span>放銃者</span>
+                  <select
+                    value={loserPlayerId}
+                    onChange={(event) => setLoserPlayerId(event.target.value)}
+                  >
+                    <option value="">選択</option>
+                    {match.players
+                      .filter((player) => player.playerId !== winnerPlayerId)
+                      .map((player) => (
+                        <option key={player.playerId} value={player.playerId}>
+                          {player.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  <span className="label">ロン支払い点</span>
+                  <input
+                    inputMode="numeric"
+                    value={ronPoint}
+                    onChange={(event) => setRonPoint(event.target.value)}
+                    placeholder="例: 8000"
+                  />
+                </label>
+              </>
+            ) : winnerPlayerId ? (
+              winnerIsDealer ? (
+                <label>
+                  <span className="label">親ツモ 各自支払い点</span>
+                  <input
+                    inputMode="numeric"
+                    value={dealerTsumoPoint}
+                    onChange={(event) => setDealerTsumoPoint(event.target.value)}
+                    placeholder="例: 4000"
+                  />
+                </label>
+              ) : (
+                <div className="score-input-grid">
+                  <label>
+                    <span>子ツモ 親支払い点</span>
+                    <input
+                      inputMode="numeric"
+                      value={dealerTsumoPoint}
+                      onChange={(event) => setDealerTsumoPoint(event.target.value)}
+                      placeholder="例: 3900"
+                    />
+                  </label>
+                  <label>
+                    <span>子ツモ 子支払い点</span>
+                    <input
+                      inputMode="numeric"
+                      value={childTsumoPoint}
+                      onChange={(event) => setChildTsumoPoint(event.target.value)}
+                      placeholder="例: 2000"
+                    />
+                  </label>
+                </div>
+              )
             ) : null}
+
+            <div className="notice">
+              <strong>供託回収</strong>
+              <span>
+                現在供託 {match.currentRiichiSticks}本 + 今回リーチ{" "}
+                {riichiPlayerIds.length}本を和了者が回収します。
+              </span>
+            </div>
           </>
         ) : null}
 
@@ -379,7 +579,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               <input
                 inputMode="numeric"
                 value={
-                  handType === "draw"
+                  handType === "win" || handType === "draw"
                     ? String(
                         scoreDeltas.find(
                           (scoreDelta) => scoreDelta.playerId === player.playerId,
@@ -387,7 +587,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                       )
                     : scoreInputs[player.playerId] ?? "0"
                 }
-                readOnly={handType === "draw"}
+                readOnly={handType === "win" || handType === "draw"}
                 onChange={(event) =>
                   setScoreInputs((current) => ({
                     ...current,
@@ -400,10 +600,13 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         </div>
         <p
           className={
-            scoreDeltaTotal === 0 || !requiresZeroSumScoreDelta ? "success-text" : "error"
+            scoreDeltaTotalIsValid ? "success-text" : "error"
           }
         >
           点数増減合計: {scoreDeltaTotal.toLocaleString()}
+          {handType === "win"
+            ? ` / 供託回収分 ${expectedScoreDeltaTotal.toLocaleString()} と一致すれば保存できます`
+            : ""}
           {handType === "draw"
             ? " / ノーテン罰符とリーチ棒を自動計算しています"
             : ""}
