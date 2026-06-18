@@ -9,9 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import {
+  getRedirectResult,
   onAuthStateChanged,
   signInWithRedirect,
-  signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
@@ -34,6 +34,24 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const AUTH_CHECK_TIMEOUT_MS = 5000;
 
+function authErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("auth/unauthorized-domain")) {
+    return "このURLはFirebase Authenticationの承認済みドメインに登録されていません。Firebase Consoleで現在のドメインをAuthorized domainsに追加してください。";
+  }
+
+  if (message.includes("auth/popup-blocked")) {
+    return "ログイン画面のポップアップがブロックされました。ページを再読み込みしてもう一度試してください。";
+  }
+
+  if (message.includes("permission")) {
+    return "ログインは完了しましたが、Firestoreへのユーザー情報保存が権限エラーで失敗しました。Firebase ConsoleでFirestore Rulesを設定してください。";
+  }
+
+  return message || "Googleログインに失敗しました。";
+}
+
 async function upsertUserProfile(currentUser: User) {
   const userRef = doc(getFirebaseDb(), "users", currentUser.uid);
   const userSnapshot = await getDoc(userRef);
@@ -54,7 +72,7 @@ async function upsertUserProfile(currentUser: User) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(isFirebaseConfigured);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,7 +91,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let unsubscribe: (() => void) | undefined;
 
     try {
-      unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (currentUser) => {
+      const auth = getFirebaseAuth();
+
+      void getRedirectResult(auth)
+        .then(async (result) => {
+          if (result?.user) {
+            await upsertUserProfile(result.user);
+          }
+        })
+        .catch((redirectError) => {
+          setError(authErrorMessage(redirectError));
+        });
+
+      unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
         authResolved = true;
         window.clearTimeout(timeoutId);
         setUser(currentUser);
@@ -117,27 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
           const auth = getFirebaseAuth();
-          const useRedirect =
-            window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768;
-
-          if (useRedirect) {
-            await signInWithRedirect(auth, googleAuthProvider);
-            return;
-          }
-
-          const result = await signInWithPopup(auth, googleAuthProvider);
-          await upsertUserProfile(result.user);
+          await signInWithRedirect(auth, googleAuthProvider);
         } catch (signInError) {
-          const message =
-            signInError instanceof Error
-              ? signInError.message
-              : "Googleログインに失敗しました。";
-
-          setError(
-            message.includes("permission")
-              ? "ログインは完了しましたが、Firestoreへのユーザー情報保存が権限エラーで失敗しました。Firebase ConsoleでFirestore Rulesを設定してください。"
-              : message,
-          );
+          setError(authErrorMessage(signInError));
         }
       },
       logout: async () => {
