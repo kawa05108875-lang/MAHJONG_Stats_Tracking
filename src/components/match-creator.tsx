@@ -47,6 +47,8 @@ function createRuleForm(rule: MatchRule) {
     umaFourth: String(rule.uma.fourth),
     bankruptcyEnabled: rule.bankruptcyEnabled,
     dealerRepeatRule: rule.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
+    agariYameEnabled: rule.agariYameEnabled ?? true,
+    westRoundEnabled: rule.westRoundEnabled ?? false,
   };
 }
 
@@ -223,6 +225,8 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       bankruptcyEnabled: ruleForm.bankruptcyEnabled,
       tieBreak: group.defaultRule.tieBreak,
       dealerRepeatRule: ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
+      agariYameEnabled: ruleForm.agariYameEnabled,
+      westRoundEnabled: ruleForm.westRoundEnabled,
     };
   }
 
@@ -477,6 +481,38 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             <option value="dealer-win-or-tenpai">親和了・親テンパイ流局で連荘</option>
             <option value="dealer-win">親和了のみ連荘</option>
             <option value="always">流局は親テンパイに関係なく連荘</option>
+          </select>
+        </label>
+
+        <label className="select-field">
+          <span>西入</span>
+          <select
+            value={ruleForm.westRoundEnabled ? "enabled" : "disabled"}
+            onChange={(event) =>
+              setRuleForm((current) => ({
+                ...current,
+                westRoundEnabled: event.target.value === "enabled",
+              }))
+            }
+          >
+            <option value="enabled">あり: 南4局終了時に誰も返し点未満なら西入</option>
+            <option value="disabled">なし: 南4局で半荘終了</option>
+          </select>
+        </label>
+
+        <label className="select-field">
+          <span>上がりやめ</span>
+          <select
+            value={ruleForm.agariYameEnabled ? "enabled" : "disabled"}
+            onChange={(event) =>
+              setRuleForm((current) => ({
+                ...current,
+                agariYameEnabled: event.target.value === "enabled",
+              }))
+            }
+          >
+            <option value="enabled">あり: 最終局の親がトップで和了したら終了</option>
+            <option value="disabled">なし: 親が和了したら連荘</option>
           </select>
         </label>
 

@@ -13,7 +13,7 @@ export type SeatIndex = 0 | 1 | 2 | 3;
 
 export type Wind = "east" | "south" | "west" | "north";
 
-export type RoundWind = "east" | "south";
+export type RoundWind = "east" | "south" | "west";
 
 export type RoundNumber = 1 | 2 | 3 | 4;
 
@@ -49,6 +49,8 @@ export type MatchRule = {
   bankruptcyEnabled: boolean;
   tieBreak: TieBreakRule;
   dealerRepeatRule?: DealerRepeatRule;
+  agariYameEnabled?: boolean;
+  westRoundEnabled?: boolean;
 };
 
 export type Group = {
@@ -180,4 +182,6 @@ export const DEFAULT_MATCH_RULE: MatchRule = {
   bankruptcyEnabled: true,
   tieBreak: "dealer-near",
   dealerRepeatRule: "dealer-win-or-tenpai",
+  agariYameEnabled: true,
+  westRoundEnabled: false,
 };

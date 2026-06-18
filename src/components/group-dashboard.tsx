@@ -265,6 +265,21 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                 </div>
               </div>
 
+              <div className="metric-grid">
+                <div className="metric">
+                  <span className="label">西入</span>
+                  <strong>
+                    {selectedGroup.defaultRule.westRoundEnabled ? "あり" : "なし"}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <span className="label">上がりやめ</span>
+                  <strong>
+                    {selectedGroup.defaultRule.agariYameEnabled ?? true ? "あり" : "なし"}
+                  </strong>
+                </div>
+              </div>
+
               <PlayerManager groupId={selectedGroup.groupId} user={user} />
               <MatchCreator key={selectedGroup.groupId} group={selectedGroup} user={user} />
               <StatsDashboard groupId={selectedGroup.groupId} />
