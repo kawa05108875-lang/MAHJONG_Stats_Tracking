@@ -10,7 +10,11 @@ import {
   type HandSummary,
 } from "@/lib/firestore/hands";
 import { finishMatch, type MatchSummary } from "@/lib/firestore/matches";
-import { calculateCurrentScores, calculateMatchFinalResults } from "@/lib/mahjong";
+import {
+  calculateCurrentScores,
+  calculateMatchFinalResults,
+  hasBankruptPlayer,
+} from "@/lib/mahjong";
 import type { HandType, ScoreDelta, WinType } from "@/types";
 
 type HandEntryProps = {
@@ -31,6 +35,19 @@ function playerName(match: MatchSummary, playerId: string | undefined) {
 
 function createEmptyScoreInputs(match: MatchSummary) {
   return Object.fromEntries(match.players.map((player) => [player.playerId, "0"]));
+}
+
+function applyScoreDeltas(
+  currentScores: Record<string, number>,
+  scoreDeltas: ScoreDelta[],
+) {
+  return scoreDeltas.reduce<Record<string, number>>(
+    (scores, scoreDelta) => ({
+      ...scores,
+      [scoreDelta.playerId]: (scores[scoreDelta.playerId] ?? 0) + scoreDelta.delta,
+    }),
+    { ...currentScores },
+  );
 }
 
 function calculateDrawScoreDeltas(
@@ -372,6 +389,16 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         winnerPlayerId,
         tenpaiPlayerIds,
       });
+      const nextScores = applyScoreDeltas(currentScores, scoreDeltas);
+      const finalResultsByBankruptcy =
+        match.rule.bankruptcyEnabled && hasBankruptPlayer(nextScores)
+          ? calculateMatchFinalResults(
+              match.players,
+              nextScores,
+              match.dealerPlayerId,
+              match.rule,
+            )
+          : undefined;
 
       await createHandAndAdvanceMatch({
         matchId: match.matchId,
@@ -390,6 +417,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         nextRound: nextProgression.nextRound,
         nextHonba: nextProgression.nextHonba,
         nextRiichiSticks,
+        finalResults: finalResultsByBankruptcy,
         uid: user.uid,
       });
 

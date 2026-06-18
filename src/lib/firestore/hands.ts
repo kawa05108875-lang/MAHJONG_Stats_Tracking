@@ -11,6 +11,7 @@ import { getFirebaseDb } from "@/lib/firebase";
 import type {
   Hand,
   HandType,
+  MatchFinalResult,
   MatchRound,
   ScoreDelta,
   WinType,
@@ -51,6 +52,7 @@ export type CreateHandInput = {
   nextRound: MatchRound;
   nextHonba: number;
   nextRiichiSticks: number;
+  finalResults?: MatchFinalResult[];
   uid: string;
 };
 
@@ -145,6 +147,12 @@ export async function createHandAndAdvanceMatch(input: CreateHandInput) {
     currentRound: input.nextRound,
     currentHonba: input.nextHonba,
     currentRiichiSticks: input.nextRiichiSticks,
+    ...(input.finalResults
+      ? {
+          status: "finished",
+          finalResults: input.finalResults,
+        }
+      : {}),
     updatedBy: input.uid,
     updatedAt: now,
   });
