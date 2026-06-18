@@ -32,11 +32,9 @@ export default function Home() {
 
           {loading ? <p className="muted">認証状態を確認しています...</p> : null}
 
-          {!loading ? (
-            <button type="button" className="primary-button" onClick={signInWithGoogle}>
-              Googleでログイン
-            </button>
-          ) : null}
+          <button type="button" className="primary-button" onClick={signInWithGoogle}>
+            Googleでログイン
+          </button>
 
           {error ? <p className="error">{error}</p> : null}
         </div>

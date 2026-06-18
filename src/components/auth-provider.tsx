@@ -33,6 +33,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const AUTH_CHECK_TIMEOUT_MS = 5000;
+const REDIRECT_PENDING_KEY = "mahjong:auth-redirect-pending";
 
 function authErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -92,14 +93,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const auth = getFirebaseAuth();
+      const redirectWasPending =
+        window.sessionStorage.getItem(REDIRECT_PENDING_KEY) === "1";
 
       void getRedirectResult(auth)
         .then(async (result) => {
           if (result?.user) {
+            window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
             await upsertUserProfile(result.user);
+            return;
+          }
+
+          if (redirectWasPending) {
+            window.setTimeout(() => {
+              if (!auth.currentUser) {
+                setError(
+                  "Googleログインから戻りましたが、ログイン結果を取得できませんでした。Firebase AuthenticationのAuthorized domainsと、ブラウザのCookie/サイトデータ設定を確認してください。",
+                );
+              }
+            }, 1000);
           }
         })
         .catch((redirectError) => {
+          window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
           setError(authErrorMessage(redirectError));
         });
 
@@ -147,8 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
           const auth = getFirebaseAuth();
+          window.sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
           await signInWithRedirect(auth, googleAuthProvider);
         } catch (signInError) {
+          window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
           setError(authErrorMessage(signInError));
         }
       },
