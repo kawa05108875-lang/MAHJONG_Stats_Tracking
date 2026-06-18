@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   onAuthStateChanged,
+  signInWithRedirect,
   signInWithPopup,
   signOut,
   type User,
@@ -31,6 +32,7 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const AUTH_CHECK_TIMEOUT_MS = 5000;
 
 async function upsertUserProfile(currentUser: User) {
   const userRef = doc(getFirebaseDb(), "users", currentUser.uid);
@@ -60,20 +62,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-
-      if (currentUser) {
-        try {
-          await upsertUserProfile(currentUser);
-        } catch {
-          setError("Firestoreへのユーザー情報保存に失敗しました。");
-        }
+    let authResolved = false;
+    const timeoutId = window.setTimeout(() => {
+      if (!authResolved) {
+        setLoading(false);
+        setError("認証状態の確認に時間がかかっています。ログインを試してください。");
       }
-    });
+    }, AUTH_CHECK_TIMEOUT_MS);
 
-    return unsubscribe;
+    let unsubscribe: (() => void) | undefined;
+
+    try {
+      unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (currentUser) => {
+        authResolved = true;
+        window.clearTimeout(timeoutId);
+        setUser(currentUser);
+        setLoading(false);
+
+        if (currentUser) {
+          try {
+            await upsertUserProfile(currentUser);
+          } catch {
+            setError("Firestoreへのユーザー情報保存に失敗しました。");
+          }
+        }
+      });
+    } catch {
+      authResolved = true;
+      window.clearTimeout(timeoutId);
+      window.setTimeout(() => {
+        setLoading(false);
+        setError("Firebase Authenticationの初期化に失敗しました。");
+      }, 0);
+    }
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      unsubscribe?.();
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -90,7 +116,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         try {
-          const result = await signInWithPopup(getFirebaseAuth(), googleAuthProvider);
+          const auth = getFirebaseAuth();
+          const useRedirect =
+            window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768;
+
+          if (useRedirect) {
+            await signInWithRedirect(auth, googleAuthProvider);
+            return;
+          }
+
+          const result = await signInWithPopup(auth, googleAuthProvider);
           await upsertUserProfile(result.user);
         } catch (signInError) {
           const message =
