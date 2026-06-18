@@ -15,6 +15,7 @@ import {
   calculateMatchFinalResults,
   hasBankruptPlayer,
 } from "@/lib/mahjong";
+import { recalculateGroupPlayerStats } from "@/lib/firestore/stats";
 import type { HandType, ScoreDelta, WinType } from "@/types";
 
 type HandEntryProps = {
@@ -22,6 +23,14 @@ type HandEntryProps = {
   user: User;
   onSaved: () => Promise<void>;
 };
+
+function notifyStatsChanged(groupId: string) {
+  window.dispatchEvent(
+    new CustomEvent("mahjong:stats-changed", {
+      detail: { groupId },
+    }),
+  );
+}
 
 const HOUSE_LABELS = ["東", "南", "西", "北"] as const;
 
@@ -445,6 +454,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         uid: user.uid,
       });
 
+      await recalculateGroupPlayerStats(match.groupId);
+      notifyStatsChanged(match.groupId);
+
       resetForm();
       await loadHands();
       await onSaved();
@@ -482,6 +494,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         finalResults,
         uid: user.uid,
       });
+      await recalculateGroupPlayerStats(match.groupId);
+      notifyStatsChanged(match.groupId);
 
       await onSaved();
     } catch (finishError) {

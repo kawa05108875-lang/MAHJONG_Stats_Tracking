@@ -8,6 +8,7 @@ import {
   getGroupMatches,
   type MatchSummary,
 } from "@/lib/firestore/matches";
+import { deleteMatchData } from "@/lib/firestore/maintenance";
 import { getGroupPlayers, type PlayerSummary } from "@/lib/firestore/players";
 import type { GroupSummary } from "@/lib/firestore/groups";
 import type {
@@ -96,6 +97,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [ruleForm, setRuleForm] = useState(() => createRuleForm(group.defaultRule));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -263,6 +265,51 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteMatch(match: MatchSummary) {
+    const confirmed = window.confirm(
+      `この半荘を削除します。局履歴も削除されます。\n${match.date} / ${match.players
+        .map((player) => player.name)
+        .join(" / ")}\n本当に削除していいですか？`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingMatchId(match.matchId);
+    setError(null);
+
+    try {
+      const result = await deleteMatchData({
+        groupId: group.groupId,
+        matchId: match.matchId,
+      });
+
+      if (selectedMatchId === match.matchId) {
+        setSelectedMatchId(null);
+      }
+
+      setCreatedMatchId(null);
+      setError(
+        `削除しました: 半荘 ${result.deletedMatches}件 / 局履歴 ${result.deletedHands}件`,
+      );
+      await loadData();
+    } catch (deleteError) {
+      const message =
+        deleteError instanceof Error
+          ? deleteError.message
+          : "半荘データの削除に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "半荘データを削除できませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setDeletingMatchId(null);
     }
   }
 
@@ -476,6 +523,14 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             </span>
             <button type="button" onClick={() => setSelectedMatchId(match.matchId)}>
               {match.status === "finished" ? "結果" : "局入力"}
+            </button>
+            <button
+              type="button"
+              className="danger-button"
+              onClick={() => void handleDeleteMatch(match)}
+              disabled={deletingMatchId === match.matchId}
+            >
+              {deletingMatchId === match.matchId ? "削除中..." : "削除"}
             </button>
           </div>
         ))}

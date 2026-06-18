@@ -329,6 +329,55 @@ select:focus {
   font-size: 1rem;
 }
 
+.phase8-placeholder {
+  display: none;
+}
+
+.stats-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.6fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ranking-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ranking-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  text-align: left;
+}
+
+.ranking-row.is-active {
+  border-color: rgba(15, 118, 110, 0.42);
+  background: #eef9f6;
+}
+
+.ranking-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-detail {
+  display: grid;
+  gap: 10px;
+}
+
+.compact-field {
+  max-width: 280px;
+}
+
+.compact-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .empty-state {
   padding: 14px;
   border: 1px dashed var(--line);
@@ -395,6 +444,21 @@ select:focus {
   border-color: var(--danger);
 }
 
+.danger-zone {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(180, 35, 24, 0.22);
+  border-radius: 8px;
+  background: #fff8f6;
+}
+
+.danger-zone h3 {
+  font-size: 1rem;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -422,6 +486,13 @@ select:focus {
   color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.7;
+}
+
+.share-code {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 .success-text {
@@ -613,6 +684,10 @@ select:focus {
   .score-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .stats-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 520px) {
@@ -626,7 +701,9 @@ select:focus {
   .segmented-control.compact,
   .result-row,
   .player-row,
-  .player-edit {
+  .player-edit,
+  .ranking-row,
+  .compact-metrics {
     grid-template-columns: 1fr;
   }
 
