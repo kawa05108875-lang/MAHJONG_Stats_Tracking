@@ -526,7 +526,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         </button>
       </div>
 
-      <div className="score-grid">
+      <div className="score-grid hand-scoreboard">
         {currentSeatPlayers.map((player) => (
           <div
             key={player.playerId}
@@ -807,7 +807,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             : ""}
         </p>
 
-        <button type="submit" className="primary-button" disabled={saving}>
+        <button type="submit" className="primary-button sticky-action" disabled={saving}>
           局結果を保存
         </button>
       </form>
