@@ -30,6 +30,11 @@ export type WinType = "tsumo" | "ron";
 
 export type TieBreakRule = "dealer-near";
 
+export type DealerRepeatRule =
+  | "dealer-win"
+  | "dealer-win-or-tenpai"
+  | "always";
+
 export type Uma = {
   first: number;
   second: number;
@@ -43,6 +48,7 @@ export type MatchRule = {
   uma: Uma;
   bankruptcyEnabled: boolean;
   tieBreak: TieBreakRule;
+  dealerRepeatRule?: DealerRepeatRule;
 };
 
 export type Group = {
@@ -173,4 +179,5 @@ export const DEFAULT_MATCH_RULE: MatchRule = {
   },
   bankruptcyEnabled: true,
   tieBreak: "dealer-near",
+  dealerRepeatRule: "dealer-win-or-tenpai",
 };
