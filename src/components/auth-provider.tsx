@@ -9,8 +9,11 @@ import {
   type ReactNode,
 } from "react";
 import {
+  browserLocalPersistence,
   getRedirectResult,
   onAuthStateChanged,
+  setPersistence,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
   type User,
@@ -27,6 +30,7 @@ type AuthContextValue = {
   user: User | null;
   loading: boolean;
   error: string | null;
+  debugInfo: string | null;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -75,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -93,6 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const auth = getFirebaseAuth();
+      void setPersistence(auth, browserLocalPersistence).catch((persistenceError) => {
+        setDebugInfo(`auth persistence failed: ${authErrorMessage(persistenceError)}`);
+      });
+
       const redirectWasPending =
         window.sessionStorage.getItem(REDIRECT_PENDING_KEY) === "1";
 
@@ -100,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then(async (result) => {
           if (result?.user) {
             window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+            setUser(result.user);
             await upsertUserProfile(result.user);
             return;
           }
@@ -116,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .catch((redirectError) => {
           window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+          setDebugInfo(`redirect result failed: ${authErrorMessage(redirectError)}`);
           setError(authErrorMessage(redirectError));
         });
 
@@ -153,8 +164,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       error,
+      debugInfo,
       signInWithGoogle: async () => {
         setError(null);
+        setDebugInfo(null);
 
         if (!isFirebaseConfigured) {
           setError("Firebaseの環境変数が未設定です。.env.localを作成してください。");
@@ -163,11 +176,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
           const auth = getFirebaseAuth();
-          window.sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
-          await signInWithRedirect(auth, googleAuthProvider);
-        } catch (signInError) {
+          await setPersistence(auth, browserLocalPersistence);
+          const result = await signInWithPopup(auth, googleAuthProvider);
+          setUser(result.user);
           window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-          setError(authErrorMessage(signInError));
+          await upsertUserProfile(result.user);
+        } catch (signInError) {
+          const message = authErrorMessage(signInError);
+
+          if (
+            message.includes("ポップアップ") ||
+            message.includes("auth/popup-blocked")
+          ) {
+            try {
+              const auth = getFirebaseAuth();
+              window.sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
+              await signInWithRedirect(auth, googleAuthProvider);
+              return;
+            } catch (redirectError) {
+              window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+              setDebugInfo(`redirect start failed: ${authErrorMessage(redirectError)}`);
+              setError(authErrorMessage(redirectError));
+              return;
+            }
+          }
+
+          window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+          setDebugInfo(`popup failed: ${message}`);
+          setError(message);
         }
       },
       logout: async () => {
@@ -181,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await signOut(getFirebaseAuth());
       },
     }),
-    [error, loading, user],
+    [debugInfo, error, loading, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -5,7 +5,7 @@ import { useAuth } from "@/components/auth-provider";
 import { isFirebaseConfigured } from "@/lib/firebase";
 
 export default function Home() {
-  const { user, loading, error, signInWithGoogle, logout } = useAuth();
+  const { user, loading, error, debugInfo, signInWithGoogle, logout } = useAuth();
 
   if (!loading && user) {
     return <GroupDashboard user={user} onLogout={logout} />;
@@ -37,6 +37,7 @@ export default function Home() {
           </button>
 
           {error ? <p className="error">{error}</p> : null}
+          {debugInfo ? <p className="muted">{debugInfo}</p> : null}
         </div>
       </section>
     </main>
