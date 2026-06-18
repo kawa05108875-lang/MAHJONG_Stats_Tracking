@@ -220,7 +220,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       },
       bankruptcyEnabled: ruleForm.bankruptcyEnabled,
       tieBreak: group.defaultRule.tieBreak,
-      dealerRepeatRule: ruleForm.dealerRepeatRule,
+      dealerRepeatRule: ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
     };
   }
 
@@ -419,7 +419,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         <label className="select-field">
           <span>連荘ルール</span>
           <select
-            value={ruleForm.dealerRepeatRule}
+            value={ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE}
             onChange={(event) =>
               setRuleForm((current) => ({
                 ...current,
