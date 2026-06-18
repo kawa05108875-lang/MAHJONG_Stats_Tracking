@@ -135,6 +135,33 @@ function calculateWinScoreDeltas(params: {
   });
 }
 
+function getNextHandProgression(params: {
+  match: MatchSummary;
+  handType: HandType;
+  winnerPlayerId: string;
+  tenpaiPlayerIds: string[];
+}) {
+  const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
+  const dealerWon =
+    params.handType === "win" && params.winnerPlayerId === currentDealerPlayerId;
+  const dealerTenpaiDraw =
+    params.handType === "draw" && currentDealerPlayerId
+      ? params.tenpaiPlayerIds.includes(currentDealerPlayerId)
+      : false;
+
+  if (dealerWon || dealerTenpaiDraw) {
+    return {
+      nextRound: params.match.currentRound,
+      nextHonba: params.match.currentHonba + 1,
+    };
+  }
+
+  return {
+    nextRound: getNextRound(params.match.currentRound),
+    nextHonba: params.handType === "draw" ? params.match.currentHonba + 1 : 0,
+  };
+}
+
 function handTypeLabel(handType: HandType, winType?: WinType) {
   if (handType === "win") {
     return winType === "tsumo" ? "ツモ" : "ロン";
@@ -333,6 +360,13 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setError(null);
 
     try {
+      const nextProgression = getNextHandProgression({
+        match,
+        handType,
+        winnerPlayerId,
+        tenpaiPlayerIds,
+      });
+
       await createHandAndAdvanceMatch({
         matchId: match.matchId,
         groupId: match.groupId,
@@ -347,8 +381,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         tenpaiPlayerIds: handType === "draw" ? tenpaiPlayerIds : undefined,
         scoreDeltas,
         memo: null,
-        nextRound: getNextRound(match.currentRound),
-        nextHonba: 0,
+        nextRound: nextProgression.nextRound,
+        nextHonba: nextProgression.nextHonba,
         nextRiichiSticks,
         uid: user.uid,
       });
