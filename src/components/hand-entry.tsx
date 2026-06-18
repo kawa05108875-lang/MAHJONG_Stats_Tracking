@@ -23,6 +23,8 @@ type HandEntryProps = {
   onSaved: () => Promise<void>;
 };
 
+const HOUSE_LABELS = ["東", "南", "西", "北"] as const;
+
 function parseScore(value: string) {
   const parsed = Number(value);
 
@@ -81,11 +83,32 @@ function getRoundIndex(match: MatchSummary) {
 }
 
 function getCurrentDealerPlayerId(match: MatchSummary) {
-  const eastSeatIndex =
-    match.players.find((player) => player.playerId === match.dealerPlayerId)?.seatIndex ?? 0;
-  const dealerSeatIndex = (eastSeatIndex + getRoundIndex(match)) % 4;
+  const dealerSeatIndex = getCurrentDealerSeatIndex(match);
 
   return match.players.find((player) => player.seatIndex === dealerSeatIndex)?.playerId;
+}
+
+function getCurrentDealerSeatIndex(match: MatchSummary) {
+  const eastSeatIndex =
+    match.players.find((player) => player.playerId === match.dealerPlayerId)?.seatIndex ?? 0;
+
+  return (eastSeatIndex + getRoundIndex(match)) % 4;
+}
+
+function getCurrentHouseIndex(match: MatchSummary, seatIndex: number) {
+  return (seatIndex - getCurrentDealerSeatIndex(match) + 4) % 4;
+}
+
+function getCurrentHouseLabel(match: MatchSummary, seatIndex: number) {
+  return HOUSE_LABELS[getCurrentHouseIndex(match, seatIndex)];
+}
+
+function getCurrentSeatPlayers(match: MatchSummary) {
+  return [...match.players].sort(
+    (left, right) =>
+      getCurrentHouseIndex(match, left.seatIndex) -
+      getCurrentHouseIndex(match, right.seatIndex),
+  );
 }
 
 function calculateWinScoreDeltas(params: {
@@ -266,6 +289,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const nextRiichiSticks =
     handType === "draw" ? match.currentRiichiSticks + riichiPlayerIds.length : 0;
   const currentDealerPlayerId = getCurrentDealerPlayerId(match);
+  const currentSeatPlayers = useMemo(() => getCurrentSeatPlayers(match), [match]);
   const winnerIsDealer = winnerPlayerId === currentDealerPlayerId;
   const currentScores = useMemo(
     () => calculateCurrentScores(match.players, hands, match.rule.initialScore),
@@ -489,8 +513,15 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       </div>
 
       <div className="score-grid">
-        {match.players.map((player) => (
-          <div key={player.playerId} className="metric">
+        {currentSeatPlayers.map((player) => (
+          <div
+            key={player.playerId}
+            className={`metric ${player.playerId === currentDealerPlayerId ? "current-dealer" : ""}`}
+          >
+            <span className="seat-label">
+              {getCurrentHouseLabel(match, player.seatIndex)}
+              {player.playerId === currentDealerPlayerId ? " / 親" : ""}
+            </span>
             <span className="label">{player.name}</span>
             <strong>{currentScores[player.playerId]?.toLocaleString() ?? "-"}</strong>
           </div>
@@ -575,9 +606,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 }}
               >
                 <option value="">選択</option>
-                {match.players.map((player) => (
+                {currentSeatPlayers.map((player) => (
                   <option key={player.playerId} value={player.playerId}>
-                    {player.name}
+                    {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
                   </option>
                 ))}
               </select>
@@ -592,11 +623,11 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                     onChange={(event) => setLoserPlayerId(event.target.value)}
                   >
                     <option value="">選択</option>
-                    {match.players
+                    {currentSeatPlayers
                       .filter((player) => player.playerId !== winnerPlayerId)
                       .map((player) => (
                         <option key={player.playerId} value={player.playerId}>
-                          {player.name}
+                          {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
                         </option>
                       ))}
                   </select>
@@ -659,7 +690,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         {handType === "draw" ? (
           <div className="check-list">
             <span className="label">聴牌者</span>
-            {match.players.map((player) => (
+            {currentSeatPlayers.map((player) => (
               <label key={player.playerId} className="check-row">
                 <input
                   type="checkbox"
@@ -669,7 +700,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                     setDrawRiichiSticksConfirmed(false);
                   }}
                 />
-                <span>{player.name}</span>
+                <span>
+                  {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                </span>
               </label>
             ))}
           </div>
@@ -677,7 +710,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
 
         <div className="check-list">
           <span className="label">リーチ者</span>
-          {match.players.map((player) => (
+          {currentSeatPlayers.map((player) => (
             <label key={player.playerId} className="check-row">
               <input
                 type="checkbox"
@@ -687,7 +720,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                   setDrawRiichiSticksConfirmed(false);
                 }}
               />
-              <span>{player.name}</span>
+              <span>
+                {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+              </span>
             </label>
           ))}
         </div>
@@ -717,9 +752,11 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         ) : null}
 
         <div className="score-input-grid">
-          {match.players.map((player) => (
+          {currentSeatPlayers.map((player) => (
             <label key={player.playerId}>
-              <span>{player.name} 増減</span>
+              <span>
+                {getCurrentHouseLabel(match, player.seatIndex)} {player.name} 増減
+              </span>
               <input
                 inputMode="numeric"
                 value={
