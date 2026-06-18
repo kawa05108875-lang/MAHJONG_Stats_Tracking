@@ -84,7 +84,7 @@ service cloud.firestore {
         && request.resource.data.matchId == resource.data.matchId
         && request.resource.data.groupId == resource.data.groupId
         && request.resource.data.updatedBy == request.auth.uid;
-      allow delete: if false;
+      allow delete: if isGroupMember(resource.data.groupId);
     }
 
     match /hands/{handId} {
@@ -98,7 +98,7 @@ service cloud.firestore {
         && request.resource.data.groupId == resource.data.groupId
         && request.resource.data.matchId == resource.data.matchId
         && request.resource.data.updatedBy == request.auth.uid;
-      allow delete: if false;
+      allow delete: if isGroupMember(resource.data.groupId);
     }
 
     match /{document=**} {
