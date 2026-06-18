@@ -117,19 +117,28 @@ h1 {
 }
 
 button {
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
   color: var(--foreground);
   font: inherit;
+  line-height: 1.2;
   font-weight: 700;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 button:hover {
   border-color: var(--primary);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.18);
+  outline-offset: 2px;
 }
 
 button:disabled {
@@ -227,7 +236,7 @@ button:disabled {
 }
 
 input {
-  min-height: 44px;
+  min-height: 48px;
   width: 100%;
   padding: 0 12px;
   border: 1px solid var(--line);
@@ -235,6 +244,7 @@ input {
   background: #ffffff;
   color: var(--foreground);
   font: inherit;
+  font-size: 1rem;
 }
 
 input:focus {
@@ -243,7 +253,7 @@ input:focus {
 }
 
 select {
-  min-height: 44px;
+  min-height: 48px;
   width: 100%;
   padding: 0 12px;
   border: 1px solid var(--line);
@@ -251,6 +261,7 @@ select {
   background: #ffffff;
   color: var(--foreground);
   font: inherit;
+  font-size: 1rem;
 }
 
 select:focus {
@@ -388,6 +399,7 @@ select:focus {
 .manager-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
+  scroll-margin-top: 14px;
 }
 
 .check-row {
@@ -555,6 +567,12 @@ select:focus {
 .match-row > div {
   display: grid;
   gap: 4px;
+  min-width: 0;
+}
+
+.match-row > div span,
+.match-row > div strong {
+  overflow-wrap: anywhere;
 }
 
 .hand-entry-panel {
@@ -570,6 +588,7 @@ select:focus {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  overflow-x: auto;
 }
 
 .result-table {
@@ -603,6 +622,18 @@ select:focus {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.hand-scoreboard {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 -6px;
+  padding: 6px;
+  border: 1px solid rgba(217, 222, 216, 0.82);
+  border-radius: 8px;
+  background: rgba(247, 247, 244, 0.96);
+  backdrop-filter: blur(10px);
+}
+
 .score-input-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -633,6 +664,14 @@ select:focus {
   border-color: var(--primary);
   background: #eef9f6;
   color: var(--primary-strong);
+}
+
+.sticky-action {
+  position: sticky;
+  bottom: 12px;
+  z-index: 4;
+  min-height: 52px;
+  box-shadow: 0 8px 24px rgba(24, 32, 28, 0.16);
 }
 
 .floating-error {
@@ -712,8 +751,16 @@ select:focus {
     flex-direction: column;
   }
 
+  .match-row > button {
+    width: 100%;
+  }
+
   .row-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .hand-scoreboard {
+    margin: 0;
   }
 }
