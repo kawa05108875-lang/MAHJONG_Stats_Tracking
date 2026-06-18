@@ -22,6 +22,16 @@ function formatUma(group: GroupSummary) {
   return `${first >= 0 ? "+" : ""}${first} / ${second >= 0 ? "+" : ""}${second} / ${third} / ${fourth}`;
 }
 
+function firestoreErrorMessage(
+  error: unknown,
+  fallbackMessage: string,
+  permissionMessage: string,
+) {
+  const message = error instanceof Error ? error.message : fallbackMessage;
+
+  return message.includes("permission") ? permissionMessage : message;
+}
+
 export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -37,7 +47,7 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
     [groups, selectedGroupId],
   );
 
-  const loadGroups = useCallback(async () => {
+  const loadGroups = useCallback(async (preferredGroupId?: string) => {
     setLoading(true);
     setError(null);
 
@@ -45,6 +55,13 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
       const joinedGroups = await getJoinedGroups(user.uid);
       setGroups(joinedGroups);
       setSelectedGroupId((currentGroupId) => {
+        if (
+          preferredGroupId &&
+          joinedGroups.some((group) => group.groupId === preferredGroupId)
+        ) {
+          return preferredGroupId;
+        }
+
         if (currentGroupId && joinedGroups.some((group) => group.groupId === currentGroupId)) {
           return currentGroupId;
         }
@@ -52,15 +69,12 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
         return joinedGroups[0]?.groupId ?? null;
       });
     } catch (loadError) {
-      const message =
-        loadError instanceof Error
-          ? loadError.message
-          : "グループ一覧の取得に失敗しました。";
-
       setError(
-        message.includes("permission")
-          ? "グループ一覧を取得できませんでした。Firestore Security Rulesを確認してください。"
-          : message,
+        firestoreErrorMessage(
+          loadError,
+          "グループ一覧の取得に失敗しました。",
+          "グループ一覧を取得できませんでした。Firestore Security Rulesを確認してください。",
+        ),
       );
     } finally {
       setLoading(false);
@@ -95,18 +109,14 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
       });
 
       setGroupName("");
-      await loadGroups();
-      setSelectedGroupId(groupId);
+      await loadGroups(groupId);
     } catch (createError) {
-      const message =
-        createError instanceof Error
-          ? createError.message
-          : "グループ作成に失敗しました。";
-
       setError(
-        message.includes("permission")
-          ? "グループを作成できませんでした。Firestore Security Rulesを確認してください。"
-          : message,
+        firestoreErrorMessage(
+          createError,
+          "グループ作成に失敗しました。",
+          "グループを作成できませんでした。Firestore Security Rulesを確認してください。",
+        ),
       );
     } finally {
       setSaving(false);
@@ -133,18 +143,14 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
       });
 
       setJoinGroupId("");
-      await loadGroups();
-      setSelectedGroupId(groupId);
+      await loadGroups(groupId);
     } catch (joinError) {
-      const message =
-        joinError instanceof Error
-          ? joinError.message
-          : "グループ参加に失敗しました。";
-
       setError(
-        message.includes("permission")
-          ? "グループに参加できませんでした。グループIDまたはFirestore Security Rulesを確認してください。"
-          : message,
+        firestoreErrorMessage(
+          joinError,
+          "グループ参加に失敗しました。",
+          "グループに参加できませんでした。グループIDまたはFirestore Security Rulesを確認してください。",
+        ),
       );
     } finally {
       setJoining(false);
@@ -173,7 +179,7 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
               <p className="eyebrow">Groups</p>
               <h2>グループ</h2>
             </div>
-            <button type="button" onClick={loadGroups} disabled={loading}>
+            <button type="button" onClick={() => void loadGroups()} disabled={loading}>
               更新
             </button>
           </div>
