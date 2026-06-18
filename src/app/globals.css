@@ -297,8 +297,19 @@ select:focus {
   border-radius: 8px;
 }
 
+.metric.current-dealer {
+  border-color: rgba(15, 118, 110, 0.42);
+  background: #eef9f6;
+}
+
 .metric strong {
   font-size: 1.1rem;
+}
+
+.seat-label {
+  color: var(--primary-strong);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .placeholder-grid {
