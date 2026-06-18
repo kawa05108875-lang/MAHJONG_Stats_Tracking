@@ -54,6 +54,36 @@ export async function createGroup(params: { name: string; uid: string }) {
   return groupRef.id;
 }
 
+export async function joinGroup(params: { groupId: string; uid: string }) {
+  const db = getFirebaseDb();
+  const trimmedGroupId = params.groupId.trim();
+  const groupRef = doc(db, "groups", trimmedGroupId);
+  const groupSnapshot = await getDoc(groupRef);
+
+  if (!groupSnapshot.exists()) {
+    throw new Error("指定されたグループが見つかりません。");
+  }
+
+  const memberRef = doc(
+    db,
+    "groupMembers",
+    groupMemberId(trimmedGroupId, params.uid),
+  );
+  const now = serverTimestamp();
+  const batch = writeBatch(db);
+
+  batch.set(memberRef, {
+    groupId: trimmedGroupId,
+    uid: params.uid,
+    role: "member",
+    joinedAt: now,
+  });
+
+  await batch.commit();
+
+  return trimmedGroupId;
+}
+
 export async function getJoinedGroups(uid: string): Promise<GroupSummary[]> {
   const db = getFirebaseDb();
   const membersQuery = query(

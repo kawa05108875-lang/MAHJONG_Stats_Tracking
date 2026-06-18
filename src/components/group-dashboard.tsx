@@ -7,6 +7,7 @@ import { PlayerManager } from "@/components/player-manager";
 import {
   createGroup,
   getJoinedGroups,
+  joinGroup,
   type GroupSummary,
 } from "@/lib/firestore/groups";
 
@@ -25,8 +26,10 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
+  const [joinGroupId, setJoinGroupId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedGroup = useMemo(
@@ -110,6 +113,44 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
     }
   }
 
+  async function handleJoinGroup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const trimmedGroupId = joinGroupId.trim();
+
+    if (!trimmedGroupId) {
+      setError("参加するグループIDを入力してください。");
+      return;
+    }
+
+    setJoining(true);
+    setError(null);
+
+    try {
+      const groupId = await joinGroup({
+        groupId: trimmedGroupId,
+        uid: user.uid,
+      });
+
+      setJoinGroupId("");
+      await loadGroups();
+      setSelectedGroupId(groupId);
+    } catch (joinError) {
+      const message =
+        joinError instanceof Error
+          ? joinError.message
+          : "グループ参加に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "グループに参加できませんでした。グループIDまたはFirestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setJoining(false);
+    }
+  }
+
   return (
     <main className="app-frame">
       <header className="topbar">
@@ -153,6 +194,21 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
             </div>
           </form>
 
+          <form className="form-grid" onSubmit={handleJoinGroup}>
+            <label htmlFor="joinGroupId">グループIDで参加</label>
+            <div className="inline-form">
+              <input
+                id="joinGroupId"
+                value={joinGroupId}
+                onChange={(event) => setJoinGroupId(event.target.value)}
+                placeholder="共有されたグループID"
+              />
+              <button type="submit" disabled={joining}>
+                参加
+              </button>
+            </div>
+          </form>
+
           {loading ? <p className="muted">グループを読み込んでいます...</p> : null}
 
           {!loading && groups.length === 0 ? (
@@ -183,6 +239,7 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                 <div>
                   <p className="eyebrow">Group Home</p>
                   <h2>{selectedGroup.name}</h2>
+                  <p className="share-code">グループID: {selectedGroup.groupId}</p>
                 </div>
               </div>
 
