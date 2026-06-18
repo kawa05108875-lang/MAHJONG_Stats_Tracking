@@ -9,7 +9,13 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
-import type { Match, MatchFinalResult, MatchPlayer, MatchRule } from "@/types";
+import {
+  DEFAULT_MATCH_RULE,
+  type Match,
+  type MatchFinalResult,
+  type MatchPlayer,
+  type MatchRule,
+} from "@/types";
 
 export type MatchSummary = Pick<
   Match,
@@ -25,6 +31,30 @@ export type MatchSummary = Pick<
   | "currentRiichiSticks"
   | "finalResults"
 >;
+
+function toMatchSummary(match: Match): MatchSummary {
+  return {
+    matchId: match.matchId,
+    groupId: match.groupId,
+    date: match.date,
+    status: match.status,
+    players: match.players,
+    dealerPlayerId: match.dealerPlayerId,
+    rule: {
+      ...match.rule,
+      dealerRepeatRule:
+        match.rule.dealerRepeatRule ?? DEFAULT_MATCH_RULE.dealerRepeatRule,
+      westRoundEnabled:
+        match.rule.westRoundEnabled ?? DEFAULT_MATCH_RULE.westRoundEnabled,
+      agariyameEnabled:
+        match.rule.agariyameEnabled ?? DEFAULT_MATCH_RULE.agariyameEnabled,
+    },
+    currentRound: match.currentRound,
+    currentHonba: match.currentHonba,
+    currentRiichiSticks: match.currentRiichiSticks,
+    finalResults: match.finalResults ?? null,
+  };
+}
 
 export async function createMatch(params: {
   groupId: string;
@@ -77,19 +107,7 @@ export async function getGroupMatches(groupId: string): Promise<MatchSummary[]> 
     .map((snapshot) => {
       const match = snapshot.data() as Match;
 
-      return {
-        matchId: match.matchId,
-        groupId: match.groupId,
-        date: match.date,
-        status: match.status,
-        players: match.players,
-        dealerPlayerId: match.dealerPlayerId,
-        rule: match.rule,
-        currentRound: match.currentRound,
-        currentHonba: match.currentHonba,
-        currentRiichiSticks: match.currentRiichiSticks,
-        finalResults: match.finalResults,
-      } satisfies MatchSummary;
+      return toMatchSummary(match);
     })
     .sort((left, right) => right.date.localeCompare(left.date));
 }

@@ -6,14 +6,21 @@ import {
   createHandAndAdvanceMatch,
   formatRound,
   getMatchHands,
-  getNextRound,
   type HandSummary,
 } from "@/lib/firestore/hands";
 import { finishMatch, type MatchSummary } from "@/lib/firestore/matches";
 import {
+  applyScoreDeltas,
+  calculateDrawScoreDeltas,
   calculateCurrentScores,
   calculateMatchFinalResults,
+  calculateWinScoreDeltas,
+  getCurrentDealerPlayerId,
+  getCurrentHouseIndex,
+  getCurrentSeatPlayers,
+  getNextHandProgression,
   hasBankruptPlayer,
+  parseScore,
 } from "@/lib/mahjong";
 import type { HandType, ScoreDelta, WinType } from "@/types";
 
@@ -25,12 +32,6 @@ type HandEntryProps = {
 
 const HOUSE_LABELS = ["東", "南", "西", "北"] as const;
 
-function parseScore(value: string) {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function playerName(match: MatchSummary, playerId: string | undefined) {
   return match.players.find((player) => player.playerId === playerId)?.name ?? "-";
 }
@@ -39,173 +40,8 @@ function createEmptyScoreInputs(match: MatchSummary) {
   return Object.fromEntries(match.players.map((player) => [player.playerId, "0"]));
 }
 
-function applyScoreDeltas(
-  currentScores: Record<string, number>,
-  scoreDeltas: ScoreDelta[],
-) {
-  return scoreDeltas.reduce<Record<string, number>>(
-    (scores, scoreDelta) => ({
-      ...scores,
-      [scoreDelta.playerId]: (scores[scoreDelta.playerId] ?? 0) + scoreDelta.delta,
-    }),
-    { ...currentScores },
-  );
-}
-
-function calculateDrawScoreDeltas(
-  match: MatchSummary,
-  tenpaiPlayerIds: string[],
-  riichiPlayerIds: string[],
-) {
-  const tenpaiCount = tenpaiPlayerIds.length;
-  const notenCount = match.players.length - tenpaiCount;
-
-  return match.players.map((player) => {
-    const isTenpai = tenpaiPlayerIds.includes(player.playerId);
-    const riichiDelta = riichiPlayerIds.includes(player.playerId) ? -1000 : 0;
-    let notenPenaltyDelta = 0;
-
-    if (tenpaiCount > 0 && notenCount > 0) {
-      notenPenaltyDelta = isTenpai ? 3000 / tenpaiCount : -3000 / notenCount;
-    }
-
-    return {
-      playerId: player.playerId,
-      delta: notenPenaltyDelta + riichiDelta,
-    };
-  });
-}
-
-function getRoundIndex(match: MatchSummary) {
-  const windOffset = match.currentRound.wind === "south" ? 4 : 0;
-
-  return windOffset + match.currentRound.number - 1;
-}
-
-function getCurrentDealerPlayerId(match: MatchSummary) {
-  const dealerSeatIndex = getCurrentDealerSeatIndex(match);
-
-  return match.players.find((player) => player.seatIndex === dealerSeatIndex)?.playerId;
-}
-
-function getCurrentDealerSeatIndex(match: MatchSummary) {
-  const eastSeatIndex =
-    match.players.find((player) => player.playerId === match.dealerPlayerId)?.seatIndex ?? 0;
-
-  return (eastSeatIndex + getRoundIndex(match)) % 4;
-}
-
-function getCurrentHouseIndex(match: MatchSummary, seatIndex: number) {
-  return (seatIndex - getCurrentDealerSeatIndex(match) + 4) % 4;
-}
-
 function getCurrentHouseLabel(match: MatchSummary, seatIndex: number) {
   return HOUSE_LABELS[getCurrentHouseIndex(match, seatIndex)];
-}
-
-function getCurrentSeatPlayers(match: MatchSummary) {
-  return [...match.players].sort(
-    (left, right) =>
-      getCurrentHouseIndex(match, left.seatIndex) -
-      getCurrentHouseIndex(match, right.seatIndex),
-  );
-}
-
-function calculateWinScoreDeltas(params: {
-  match: MatchSummary;
-  winType: WinType;
-  winnerPlayerId: string;
-  loserPlayerId: string;
-  riichiPlayerIds: string[];
-  ronPoint: number;
-  dealerTsumoPoint: number;
-  childTsumoPoint: number;
-}) {
-  const riichiStickPoint =
-    (params.match.currentRiichiSticks + params.riichiPlayerIds.length) * 1000;
-  const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
-
-  return params.match.players.map((player) => {
-    const isWinner = player.playerId === params.winnerPlayerId;
-    const isLoser = player.playerId === params.loserPlayerId;
-    const isRiichi = params.riichiPlayerIds.includes(player.playerId);
-    const riichiDelta = isRiichi ? -1000 : 0;
-    let handDelta = 0;
-
-    if (params.winType === "ron") {
-      if (isWinner) {
-        handDelta = params.ronPoint + riichiStickPoint;
-      } else if (isLoser) {
-        handDelta = -params.ronPoint;
-      }
-    } else {
-      const winnerIsDealer = params.winnerPlayerId === currentDealerPlayerId;
-
-      if (isWinner) {
-        const paymentTotal = params.match.players
-          .filter((candidate) => candidate.playerId !== params.winnerPlayerId)
-          .reduce((total, candidate) => {
-            if (winnerIsDealer) {
-              return total + params.dealerTsumoPoint;
-            }
-
-            return (
-              total +
-              (candidate.playerId === currentDealerPlayerId
-                ? params.dealerTsumoPoint
-                : params.childTsumoPoint)
-            );
-          }, 0);
-
-        handDelta = paymentTotal + riichiStickPoint;
-      } else if (winnerIsDealer) {
-        handDelta = -params.dealerTsumoPoint;
-      } else {
-        handDelta =
-          player.playerId === currentDealerPlayerId
-            ? -params.dealerTsumoPoint
-            : -params.childTsumoPoint;
-      }
-    }
-
-    return {
-      playerId: player.playerId,
-      delta: handDelta + riichiDelta,
-    };
-  });
-}
-
-function getNextHandProgression(params: {
-  match: MatchSummary;
-  handType: HandType;
-  winnerPlayerId: string;
-  tenpaiPlayerIds: string[];
-}) {
-  const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
-  const dealerRepeatRule =
-    params.match.rule.dealerRepeatRule ?? "dealer-win-or-tenpai";
-  const dealerWon =
-    params.handType === "win" && params.winnerPlayerId === currentDealerPlayerId;
-  const dealerTenpaiDraw =
-    params.handType === "draw" && currentDealerPlayerId
-      ? params.tenpaiPlayerIds.includes(currentDealerPlayerId)
-      : false;
-  const drawRepeats =
-    params.handType === "draw" &&
-    (dealerRepeatRule === "always" ||
-      (dealerRepeatRule === "dealer-win-or-tenpai" && dealerTenpaiDraw));
-
-  if (dealerWon || drawRepeats) {
-    return {
-      nextRound: params.match.currentRound,
-      nextHonba: params.match.currentHonba + 1,
-    };
-  }
-
-  return {
-    nextRound: getNextRound(params.match.currentRound),
-    nextHonba: params.handType === "draw" ? params.match.currentHonba + 1 : 0,
-  };
 }
 
 function handTypeLabel(handType: HandType, winType?: WinType) {
@@ -407,15 +243,17 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setError(null);
 
     try {
+      const nextScores = applyScoreDeltas(currentScores, scoreDeltas);
       const nextProgression = getNextHandProgression({
         match,
         handType,
         winnerPlayerId,
         tenpaiPlayerIds,
+        nextScores,
       });
-      const nextScores = applyScoreDeltas(currentScores, scoreDeltas);
-      const finalResultsByBankruptcy =
-        match.rule.bankruptcyEnabled && hasBankruptPlayer(nextScores)
+      const finalResultsByAutoFinish =
+        (match.rule.bankruptcyEnabled && hasBankruptPlayer(nextScores)) ||
+        nextProgression.shouldFinishMatch
           ? calculateMatchFinalResults(
               match.players,
               nextScores,
@@ -441,7 +279,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         nextRound: nextProgression.nextRound,
         nextHonba: nextProgression.nextHonba,
         nextRiichiSticks,
-        finalResults: finalResultsByBankruptcy,
+        finalResults: finalResultsByAutoFinish,
         uid: user.uid,
       });
 

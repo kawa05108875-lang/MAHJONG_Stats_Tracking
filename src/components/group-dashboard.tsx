@@ -268,6 +268,18 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                     {selectedGroup.defaultRule.bankruptcyEnabled ? "あり" : "なし"}
                   </strong>
                 </div>
+                <div className="metric">
+                  <span className="label">西入</span>
+                  <strong>
+                    {selectedGroup.defaultRule.westRoundEnabled ? "あり" : "なし"}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <span className="label">上がり止め</span>
+                  <strong>
+                    {selectedGroup.defaultRule.agariyameEnabled ? "あり" : "なし"}
+                  </strong>
+                </div>
               </div>
 
               <PlayerManager groupId={selectedGroup.groupId} user={user} />

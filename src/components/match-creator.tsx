@@ -46,6 +46,8 @@ function createRuleForm(rule: MatchRule) {
     umaFourth: String(rule.uma.fourth),
     bankruptcyEnabled: rule.bankruptcyEnabled,
     dealerRepeatRule: rule.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
+    westRoundEnabled: rule.westRoundEnabled ?? false,
+    agariyameEnabled: rule.agariyameEnabled ?? true,
   };
 }
 
@@ -221,6 +223,8 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       bankruptcyEnabled: ruleForm.bankruptcyEnabled,
       tieBreak: group.defaultRule.tieBreak,
       dealerRepeatRule: ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
+      westRoundEnabled: ruleForm.westRoundEnabled,
+      agariyameEnabled: ruleForm.agariyameEnabled,
     };
   }
 
@@ -430,6 +434,38 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             <option value="dealer-win-or-tenpai">親和了・親テンパイ流局で連荘</option>
             <option value="dealer-win">親和了のみ連荘</option>
             <option value="always">流局は親テンパイに関係なく連荘</option>
+          </select>
+        </label>
+
+        <label className="select-field">
+          <span>西入</span>
+          <select
+            value={ruleForm.westRoundEnabled ? "enabled" : "disabled"}
+            onChange={(event) =>
+              setRuleForm((current) => ({
+                ...current,
+                westRoundEnabled: event.target.value === "enabled",
+              }))
+            }
+          >
+            <option value="disabled">なし: 南4局で終了</option>
+            <option value="enabled">あり: 返し点未満なら西場へ進む</option>
+          </select>
+        </label>
+
+        <label className="select-field">
+          <span>上がり止め</span>
+          <select
+            value={ruleForm.agariyameEnabled ? "enabled" : "disabled"}
+            onChange={(event) =>
+              setRuleForm((current) => ({
+                ...current,
+                agariyameEnabled: event.target.value === "enabled",
+              }))
+            }
+          >
+            <option value="enabled">あり: オーラス親がトップで返し点以上なら終了</option>
+            <option value="disabled">なし: 親が上がったら連荘</option>
           </select>
         </label>
 

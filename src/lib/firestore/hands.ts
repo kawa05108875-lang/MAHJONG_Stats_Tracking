@@ -8,6 +8,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
+export { getNextRound } from "@/lib/mahjong";
 import type {
   Hand,
   HandType,
@@ -56,31 +57,12 @@ export type CreateHandInput = {
   uid: string;
 };
 
-const ROUND_ORDER: MatchRound[] = [
-  { wind: "east", number: 1 },
-  { wind: "east", number: 2 },
-  { wind: "east", number: 3 },
-  { wind: "east", number: 4 },
-  { wind: "south", number: 1 },
-  { wind: "south", number: 2 },
-  { wind: "south", number: 3 },
-  { wind: "south", number: 4 },
-];
-
 export function formatRound(round: MatchRound) {
-  return `${round.wind === "east" ? "東" : "南"}${round.number}局`;
-}
-
-export function getNextRound(round: MatchRound): MatchRound {
-  const currentIndex = ROUND_ORDER.findIndex(
-    (candidate) => candidate.wind === round.wind && candidate.number === round.number,
-  );
-
-  if (currentIndex < 0 || currentIndex >= ROUND_ORDER.length - 1) {
-    return round;
+  if (round.wind === "west") {
+    return `${"西"}${round.number}${"局"}`;
   }
 
-  return ROUND_ORDER[currentIndex + 1];
+  return `${round.wind === "east" ? "東" : "南"}${round.number}局`;
 }
 
 export async function getMatchHands(groupId: string, matchId: string): Promise<HandSummary[]> {
@@ -88,12 +70,12 @@ export async function getMatchHands(groupId: string, matchId: string): Promise<H
   const handsQuery = query(
     collection(db, "hands"),
     where("groupId", "==", groupId),
+    where("matchId", "==", matchId),
   );
   const handSnapshots = await getDocs(handsQuery);
 
   return handSnapshots.docs
     .map((snapshot) => snapshot.data() as Hand)
-    .filter((hand) => hand.matchId === matchId)
     .map((hand) => {
       return {
         handId: hand.handId,

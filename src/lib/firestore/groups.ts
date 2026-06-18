@@ -22,6 +22,24 @@ function groupMemberId(groupId: string, uid: string) {
   return `${groupId}_${uid}`;
 }
 
+function toGroupSummary(group: Group, membership: GroupMember): GroupSummary {
+  return {
+    groupId: group.groupId,
+    name: group.name,
+    createdBy: group.createdBy,
+    defaultRule: {
+      ...group.defaultRule,
+      dealerRepeatRule:
+        group.defaultRule.dealerRepeatRule ?? DEFAULT_MATCH_RULE.dealerRepeatRule,
+      westRoundEnabled:
+        group.defaultRule.westRoundEnabled ?? DEFAULT_MATCH_RULE.westRoundEnabled,
+      agariyameEnabled:
+        group.defaultRule.agariyameEnabled ?? DEFAULT_MATCH_RULE.agariyameEnabled,
+    },
+    joinedAt: membership.joinedAt,
+  };
+}
+
 export async function createGroup(params: { name: string; uid: string }) {
   const db = getFirebaseDb();
   const groupRef = doc(collection(db, "groups"));
@@ -103,13 +121,7 @@ export async function getJoinedGroups(uid: string): Promise<GroupSummary[]> {
 
       const group = groupSnapshot.data() as Group;
 
-      return {
-        groupId: group.groupId,
-        name: group.name,
-        createdBy: group.createdBy,
-        defaultRule: group.defaultRule,
-        joinedAt: membership.joinedAt,
-      } satisfies GroupSummary;
+      return toGroupSummary(group, membership);
     }),
   );
 
