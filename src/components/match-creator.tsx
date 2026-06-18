@@ -400,18 +400,20 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
           </label>
         </div>
 
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={ruleForm.bankruptcyEnabled}
+        <label className="select-field">
+          <span>トビ終了</span>
+          <select
+            value={ruleForm.bankruptcyEnabled ? "enabled" : "disabled"}
             onChange={(event) =>
               setRuleForm((current) => ({
                 ...current,
-                bankruptcyEnabled: event.target.checked,
+                bankruptcyEnabled: event.target.value === "enabled",
               }))
             }
-          />
-          <span>トビ終了あり</span>
+          >
+            <option value="enabled">飛びあり: 誰かが飛んだら終了</option>
+            <option value="disabled">飛びなし: 誰かが飛んでも続行</option>
+          </select>
         </label>
 
         <label className="select-field">
