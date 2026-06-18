@@ -14,55 +14,296 @@ service cloud.firestore {
       return /databases/$(database)/documents/groupMembers/$(groupId + "_" + uid);
     }
 
+    function groupPath(groupId) {
+      return /databases/$(database)/documents/groups/$(groupId);
+    }
+
     function isGroupMember(groupId) {
       return isSignedIn() && exists(groupMemberPath(groupId, request.auth.uid));
     }
 
+    function groupExistsAfter(groupId) {
+      return existsAfter(groupPath(groupId));
+    }
+
+    function isValidMatchRule(rule) {
+      return rule is map
+        && rule.keys().hasOnly([
+          "initialScore",
+          "returnScore",
+          "uma",
+          "bankruptcyEnabled",
+          "tieBreak",
+          "dealerRepeatRule",
+        ])
+        && rule.keys().hasAll([
+          "initialScore",
+          "returnScore",
+          "uma",
+          "bankruptcyEnabled",
+          "tieBreak",
+        ])
+        && rule.initialScore is number
+        && rule.returnScore is number
+        && rule.uma is map
+        && rule.uma.keys().hasOnly(["first", "second", "third", "fourth"])
+        && rule.uma.keys().hasAll(["first", "second", "third", "fourth"])
+        && rule.uma.first is number
+        && rule.uma.second is number
+        && rule.uma.third is number
+        && rule.uma.fourth is number
+        && rule.bankruptcyEnabled is bool
+        && rule.tieBreak == "dealer-near"
+        && (
+          !("dealerRepeatRule" in rule)
+          || rule.dealerRepeatRule in ["dealer-win", "dealer-win-or-tenpai", "always"]
+        );
+    }
+
+    function isValidRound(round) {
+      return round is map
+        && round.keys().hasOnly(["wind", "number"])
+        && round.keys().hasAll(["wind", "number"])
+        && round.wind in ["east", "south"]
+        && round.number in [1, 2, 3, 4];
+    }
+
+    function isValidUserProfile(uid) {
+      return request.resource.data.keys().hasOnly([
+        "uid",
+        "displayName",
+        "email",
+        "photoURL",
+        "createdAt",
+        "updatedAt",
+      ])
+        && request.resource.data.keys().hasAll([
+          "uid",
+          "displayName",
+          "email",
+          "photoURL",
+          "createdAt",
+          "updatedAt",
+        ])
+        && request.resource.data.uid == uid
+        && (request.resource.data.displayName == null || request.resource.data.displayName is string)
+        && (request.resource.data.email == null || request.resource.data.email is string)
+        && (request.resource.data.photoURL == null || request.resource.data.photoURL is string);
+    }
+
+    function isValidPlayerStats(playerId) {
+      return request.resource.data.keys().hasOnly([
+        "playerId",
+        "groupId",
+        "matchCount",
+        "handCount",
+        "totalPoint",
+        "averagePoint",
+        "averageRank",
+        "totalScore",
+        "averageScore",
+        "winCount",
+        "dealInCount",
+        "tsumoWinCount",
+        "ronWinCount",
+        "firstPlaceCount",
+        "secondPlaceCount",
+        "thirdPlaceCount",
+        "fourthPlaceCount",
+        "winRate",
+        "dealInRate",
+        "tsumoRate",
+        "ronRate",
+        "firstPlaceRate",
+        "secondOrBetterRate",
+        "fourthPlaceRate",
+        "updatedAt",
+      ])
+        && request.resource.data.keys().hasAll([
+          "playerId",
+          "groupId",
+          "matchCount",
+          "handCount",
+          "totalPoint",
+          "averagePoint",
+          "averageRank",
+          "totalScore",
+          "averageScore",
+          "winCount",
+          "dealInCount",
+          "tsumoWinCount",
+          "ronWinCount",
+          "firstPlaceCount",
+          "secondPlaceCount",
+          "thirdPlaceCount",
+          "fourthPlaceCount",
+          "winRate",
+          "dealInRate",
+          "tsumoRate",
+          "ronRate",
+          "firstPlaceRate",
+          "secondOrBetterRate",
+          "fourthPlaceRate",
+          "updatedAt",
+        ])
+        && request.resource.data.playerId == playerId
+        && request.resource.data.groupId is string
+        && request.resource.data.matchCount is number
+        && request.resource.data.handCount is number
+        && request.resource.data.totalPoint is number
+        && request.resource.data.averagePoint is number
+        && request.resource.data.averageRank is number
+        && request.resource.data.totalScore is number
+        && request.resource.data.averageScore is number
+        && request.resource.data.winCount is number
+        && request.resource.data.dealInCount is number
+        && request.resource.data.tsumoWinCount is number
+        && request.resource.data.ronWinCount is number
+        && request.resource.data.firstPlaceCount is number
+        && request.resource.data.secondPlaceCount is number
+        && request.resource.data.thirdPlaceCount is number
+        && request.resource.data.fourthPlaceCount is number
+        && request.resource.data.winRate is number
+        && request.resource.data.dealInRate is number
+        && request.resource.data.tsumoRate is number
+        && request.resource.data.ronRate is number
+        && request.resource.data.firstPlaceRate is number
+        && request.resource.data.secondOrBetterRate is number
+        && request.resource.data.fourthPlaceRate is number
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /users/{uid} {
-      allow read, create, update: if isSelf(uid);
+      allow read: if isSelf(uid);
+      allow create: if isSelf(uid)
+        && isValidUserProfile(uid)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isSelf(uid)
+        && isValidUserProfile(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
 
     match /groups/{groupId} {
       allow get: if isSignedIn();
-      allow list, update: if isGroupMember(groupId);
+      allow list: if false;
       allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          "groupId",
+          "name",
+          "createdBy",
+          "defaultRule",
+          "createdAt",
+          "updatedAt",
+        ])
+        && request.resource.data.keys().hasAll([
+          "groupId",
+          "name",
+          "createdBy",
+          "defaultRule",
+          "createdAt",
+          "updatedAt",
+        ])
         && request.resource.data.groupId == groupId
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.createdBy == request.auth.uid
+        && isValidMatchRule(request.resource.data.defaultRule)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isGroupMember(resource.data.groupId)
+        && request.resource.data.keys().hasOnly([
+          "groupId",
+          "name",
+          "createdBy",
+          "defaultRule",
+          "createdAt",
+          "updatedAt",
+        ])
+        && request.resource.data.groupId == resource.data.groupId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 60
+        && isValidMatchRule(request.resource.data.defaultRule)
+        && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
 
     match /groupMembers/{groupMemberId} {
       allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
       allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(["groupId", "uid", "role", "joinedAt"])
+        && request.resource.data.keys().hasAll(["groupId", "uid", "role", "joinedAt"])
+        && request.resource.data.groupId is string
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.role == "member"
+        && request.resource.data.joinedAt == request.time
         && groupMemberId == request.resource.data.groupId + "_" + request.auth.uid
-        && exists(/databases/$(database)/documents/groups/$(request.resource.data.groupId));
+        && groupExistsAfter(request.resource.data.groupId);
       allow update, delete: if false;
     }
 
     match /players/{playerId} {
       allow read: if isGroupMember(resource.data.groupId);
       allow create: if isGroupMember(request.resource.data.groupId)
+        && request.resource.data.keys().hasOnly([
+          "playerId",
+          "groupId",
+          "name",
+          "linkedUid",
+          "createdAt",
+          "updatedAt",
+        ])
+        && request.resource.data.keys().hasAll([
+          "playerId",
+          "groupId",
+          "name",
+          "linkedUid",
+          "createdAt",
+          "updatedAt",
+        ])
         && request.resource.data.playerId == playerId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 30
         && (
-          !("linkedUid" in request.resource.data)
-          || request.resource.data.linkedUid == null
+          request.resource.data.linkedUid == null
           || request.resource.data.linkedUid == request.auth.uid
-        );
+        )
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
       allow update: if isGroupMember(resource.data.groupId)
+        && request.resource.data.keys().hasOnly([
+          "playerId",
+          "groupId",
+          "name",
+          "linkedUid",
+          "createdAt",
+          "updatedAt",
+        ])
         && request.resource.data.playerId == resource.data.playerId
         && request.resource.data.groupId == resource.data.groupId
-        && request.resource.data.linkedUid == resource.data.linkedUid;
+        && request.resource.data.linkedUid == resource.data.linkedUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 30
+        && request.resource.data.updatedAt == request.time;
       allow delete: if isGroupMember(resource.data.groupId);
     }
 
     match /playerStats/{playerId} {
       allow read: if isGroupMember(resource.data.groupId);
       allow create: if isGroupMember(request.resource.data.groupId)
-        && request.resource.data.playerId == playerId;
+        && isValidPlayerStats(playerId);
       allow update: if isGroupMember(resource.data.groupId)
+        && isValidPlayerStats(playerId)
         && request.resource.data.playerId == resource.data.playerId
         && request.resource.data.groupId == resource.data.groupId;
       allow delete: if isGroupMember(resource.data.groupId);
@@ -71,28 +312,177 @@ service cloud.firestore {
     match /matches/{matchId} {
       allow read: if isGroupMember(resource.data.groupId);
       allow create: if isGroupMember(request.resource.data.groupId)
+        && request.resource.data.keys().hasOnly([
+          "matchId",
+          "groupId",
+          "date",
+          "status",
+          "players",
+          "dealerPlayerId",
+          "rule",
+          "currentRound",
+          "currentHonba",
+          "currentRiichiSticks",
+          "finalResults",
+          "createdBy",
+          "updatedBy",
+          "createdAt",
+          "updatedAt",
+        ])
+        && request.resource.data.keys().hasAll([
+          "matchId",
+          "groupId",
+          "date",
+          "status",
+          "players",
+          "dealerPlayerId",
+          "rule",
+          "currentRound",
+          "currentHonba",
+          "currentRiichiSticks",
+          "finalResults",
+          "createdBy",
+          "updatedBy",
+          "createdAt",
+          "updatedAt",
+        ])
         && request.resource.data.matchId == matchId
+        && request.resource.data.date is string
+        && request.resource.data.status == "inputting"
+        && request.resource.data.players is list
+        && request.resource.data.players.size() == 4
+        && request.resource.data.dealerPlayerId is string
+        && isValidMatchRule(request.resource.data.rule)
+        && isValidRound(request.resource.data.currentRound)
+        && request.resource.data.currentHonba is number
+        && request.resource.data.currentHonba >= 0
+        && request.resource.data.currentRiichiSticks is number
+        && request.resource.data.currentRiichiSticks >= 0
+        && request.resource.data.finalResults == null
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.updatedBy == request.auth.uid
-        && request.resource.data.status == "inputting";
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
       allow update: if isGroupMember(resource.data.groupId)
+        && request.resource.data.keys().hasOnly([
+          "matchId",
+          "groupId",
+          "date",
+          "status",
+          "players",
+          "dealerPlayerId",
+          "rule",
+          "currentRound",
+          "currentHonba",
+          "currentRiichiSticks",
+          "finalResults",
+          "createdBy",
+          "updatedBy",
+          "createdAt",
+          "updatedAt",
+        ])
         && request.resource.data.matchId == resource.data.matchId
         && request.resource.data.groupId == resource.data.groupId
-        && request.resource.data.updatedBy == request.auth.uid;
+        && request.resource.data.date == resource.data.date
+        && request.resource.data.players == resource.data.players
+        && request.resource.data.dealerPlayerId == resource.data.dealerPlayerId
+        && request.resource.data.rule == resource.data.rule
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.status in ["inputting", "finished", "cancelled"]
+        && isValidRound(request.resource.data.currentRound)
+        && request.resource.data.currentHonba is number
+        && request.resource.data.currentHonba >= 0
+        && request.resource.data.currentRiichiSticks is number
+        && request.resource.data.currentRiichiSticks >= 0
+        && (
+          request.resource.data.finalResults == null
+          || request.resource.data.finalResults is list
+        )
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
       allow delete: if isGroupMember(resource.data.groupId);
     }
 
     match /hands/{handId} {
       allow read: if isGroupMember(resource.data.groupId);
       allow create: if isGroupMember(request.resource.data.groupId)
+        && request.resource.data.keys().hasOnly([
+          "handId",
+          "matchId",
+          "groupId",
+          "round",
+          "honba",
+          "riichiSticksBefore",
+          "handType",
+          "winType",
+          "riichiPlayerIds",
+          "winnerPlayerId",
+          "loserPlayerId",
+          "tenpaiPlayerIds",
+          "scoreDeltas",
+          "memo",
+          "createdBy",
+          "updatedBy",
+          "createdAt",
+          "updatedAt",
+        ])
+        && request.resource.data.keys().hasAll([
+          "handId",
+          "matchId",
+          "groupId",
+          "round",
+          "honba",
+          "riichiSticksBefore",
+          "handType",
+          "riichiPlayerIds",
+          "scoreDeltas",
+          "memo",
+          "createdBy",
+          "updatedBy",
+          "createdAt",
+          "updatedAt",
+        ])
         && request.resource.data.handId == handId
+        && request.resource.data.matchId is string
+        && isValidRound(request.resource.data.round)
+        && request.resource.data.honba is number
+        && request.resource.data.honba >= 0
+        && request.resource.data.riichiSticksBefore is number
+        && request.resource.data.riichiSticksBefore >= 0
+        && request.resource.data.handType in ["win", "draw", "penalty"]
+        && (
+          !("winType" in request.resource.data)
+          || request.resource.data.winType in ["tsumo", "ron"]
+        )
+        && request.resource.data.riichiPlayerIds is list
+        && (
+          !("winnerPlayerId" in request.resource.data)
+          || request.resource.data.winnerPlayerId is string
+        )
+        && (
+          !("loserPlayerId" in request.resource.data)
+          || request.resource.data.loserPlayerId is string
+        )
+        && (
+          !("tenpaiPlayerIds" in request.resource.data)
+          || request.resource.data.tenpaiPlayerIds is list
+        )
+        && request.resource.data.scoreDeltas is list
+        && request.resource.data.scoreDeltas.size() == 4
+        && (request.resource.data.memo == null || request.resource.data.memo is string)
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.updatedBy == request.auth.uid;
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
       allow update: if isGroupMember(resource.data.groupId)
         && request.resource.data.handId == resource.data.handId
         && request.resource.data.groupId == resource.data.groupId
         && request.resource.data.matchId == resource.data.matchId
-        && request.resource.data.updatedBy == request.auth.uid;
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
       allow delete: if isGroupMember(resource.data.groupId);
     }
 

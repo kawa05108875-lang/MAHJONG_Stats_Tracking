@@ -1,109 +1,16 @@
-# Firestore Rules貼り付け用
+# Firestore Rules 貼り付け用
 
-Firebase Consoleの `Firestore Database` -> `ルール` に、下の内容だけをコピーして貼り付けてください。
+Firebase Console の `Firestore Database` -> `ルール` に、プロジェクトルートの `firestore.rules` と同じ内容を貼り付けて公開してください。
 
-```js
-rules_version = '2';
+フェーズ9のRules方針:
 
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null;
-    }
+- 未ログインユーザーは全Firestoreデータにアクセス不可。
+- `users` は本人のドキュメントだけ読み書き可能。
+- グループID参加に必要なため、ログイン済みユーザーは `groups/{groupId}` を単体取得できる。
+- `players`、`matches`、`hands`、`playerStats` は対象グループの `groupMembers` に存在するログインユーザーだけ読み書き可能。
+- `groupMembers` は本人の参加情報だけ読める。作成は本人の `uid` で `role: "member"` のみ許可。
+- `groupId`、各ドキュメントID、作成者、作成日時などの不変フィールドは更新不可。
+- 半荘データ削除機能のため、グループメンバーは `matches` と `hands` を削除できる。
+- 未定義コレクションと想定外操作はすべて拒否。
 
-    function isSelf(uid) {
-      return isSignedIn() && request.auth.uid == uid;
-    }
-
-    function groupMemberPath(groupId, uid) {
-      return /databases/$(database)/documents/groupMembers/$(groupId + "_" + uid);
-    }
-
-    function isGroupMember(groupId) {
-      return isSignedIn() && exists(groupMemberPath(groupId, request.auth.uid));
-    }
-
-    match /users/{uid} {
-      allow read, create, update: if isSelf(uid);
-      allow delete: if false;
-    }
-
-    match /groups/{groupId} {
-      allow get: if isSignedIn();
-      allow list, update: if isGroupMember(groupId);
-      allow create: if isSignedIn()
-        && request.resource.data.groupId == groupId
-        && request.resource.data.createdBy == request.auth.uid;
-      allow delete: if false;
-    }
-
-    match /groupMembers/{groupMemberId} {
-      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
-      allow create: if isSignedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.role == "member"
-        && groupMemberId == request.resource.data.groupId + "_" + request.auth.uid
-        && exists(/databases/$(database)/documents/groups/$(request.resource.data.groupId));
-      allow update, delete: if false;
-    }
-
-    match /players/{playerId} {
-      allow read: if isGroupMember(resource.data.groupId);
-      allow create: if isGroupMember(request.resource.data.groupId)
-        && request.resource.data.playerId == playerId
-        && (
-          !("linkedUid" in request.resource.data)
-          || request.resource.data.linkedUid == null
-          || request.resource.data.linkedUid == request.auth.uid
-        );
-      allow update: if isGroupMember(resource.data.groupId)
-        && request.resource.data.playerId == resource.data.playerId
-        && request.resource.data.groupId == resource.data.groupId
-        && request.resource.data.linkedUid == resource.data.linkedUid;
-      allow delete: if isGroupMember(resource.data.groupId);
-    }
-
-    match /playerStats/{playerId} {
-      allow read: if isGroupMember(resource.data.groupId);
-      allow create: if isGroupMember(request.resource.data.groupId)
-        && request.resource.data.playerId == playerId;
-      allow update: if isGroupMember(resource.data.groupId)
-        && request.resource.data.playerId == resource.data.playerId
-        && request.resource.data.groupId == resource.data.groupId;
-      allow delete: if isGroupMember(resource.data.groupId);
-    }
-
-    match /matches/{matchId} {
-      allow read: if isGroupMember(resource.data.groupId);
-      allow create: if isGroupMember(request.resource.data.groupId)
-        && request.resource.data.matchId == matchId
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.updatedBy == request.auth.uid
-        && request.resource.data.status == "inputting";
-      allow update: if isGroupMember(resource.data.groupId)
-        && request.resource.data.matchId == resource.data.matchId
-        && request.resource.data.groupId == resource.data.groupId
-        && request.resource.data.updatedBy == request.auth.uid;
-      allow delete: if isGroupMember(resource.data.groupId);
-    }
-
-    match /hands/{handId} {
-      allow read: if isGroupMember(resource.data.groupId);
-      allow create: if isGroupMember(request.resource.data.groupId)
-        && request.resource.data.handId == handId
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.updatedBy == request.auth.uid;
-      allow update: if isGroupMember(resource.data.groupId)
-        && request.resource.data.handId == resource.data.handId
-        && request.resource.data.groupId == resource.data.groupId
-        && request.resource.data.matchId == resource.data.matchId
-        && request.resource.data.updatedBy == request.auth.uid;
-      allow delete: if isGroupMember(resource.data.groupId);
-    }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-```
+最新のRules本文は [firestore.rules](../firestore.rules) を参照してください。
