@@ -29,7 +29,8 @@ service cloud.firestore {
     }
 
     match /groups/{groupId} {
-      allow read, update: if isGroupMember(groupId);
+      allow get: if isSignedIn();
+      allow list, update: if isGroupMember(groupId);
       allow create: if isSignedIn()
         && request.resource.data.groupId == groupId
         && request.resource.data.createdBy == request.auth.uid;
@@ -41,7 +42,8 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.role == "member"
-        && groupMemberId == request.resource.data.groupId + "_" + request.auth.uid;
+        && groupMemberId == request.resource.data.groupId + "_" + request.auth.uid
+        && exists(/databases/$(database)/documents/groups/$(request.resource.data.groupId));
       allow update, delete: if false;
     }
 
