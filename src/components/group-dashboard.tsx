@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import type { User } from "firebase/auth";
 import { MatchCreator } from "@/components/match-creator";
 import { PlayerManager } from "@/components/player-manager";
+import { StatsDashboard } from "@/components/stats-dashboard";
 import {
   createGroup,
   getJoinedGroups,
@@ -209,8 +210,9 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
 
               <PlayerManager groupId={selectedGroup.groupId} user={user} />
               <MatchCreator key={selectedGroup.groupId} group={selectedGroup} user={user} />
+              <StatsDashboard groupId={selectedGroup.groupId} />
 
-              <div className="placeholder-grid">
+              <div className="placeholder-grid phase8-placeholder">
                 <div>
                   <h3>ランキング概要</h3>
                   <p className="muted">フェーズ8で成績集計後に表示します。</p>
