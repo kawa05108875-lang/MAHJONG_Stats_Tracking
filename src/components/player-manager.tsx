@@ -6,6 +6,7 @@ import {
   createPlayer,
   deleteUnusedPlayer,
   getGroupPlayers,
+  updatePlayerLinkedUid,
   updatePlayerName,
   type PlayerSummary,
 } from "@/lib/firestore/players";
@@ -193,6 +194,62 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
     }
   }
 
+  async function handleLinkPlayer(player: PlayerSummary) {
+    setSaving(true);
+    setError(null);
+
+    try {
+      await updatePlayerLinkedUid({
+        playerId: player.playerId,
+        linkedUid: user.uid,
+      });
+
+      await loadPlayers();
+      notifyPlayersChanged(groupId);
+    } catch (linkError) {
+      const message =
+        linkError instanceof Error
+          ? linkError.message
+          : "Googleアカウントとの紐づけに失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "Googleアカウントと紐づけできませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUnlinkPlayer(player: PlayerSummary) {
+    setSaving(true);
+    setError(null);
+
+    try {
+      await updatePlayerLinkedUid({
+        playerId: player.playerId,
+        linkedUid: null,
+      });
+
+      await loadPlayers();
+      notifyPlayersChanged(groupId);
+    } catch (unlinkError) {
+      const message =
+        unlinkError instanceof Error
+          ? unlinkError.message
+          : "Googleアカウントとの紐づけ解除に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "Googleアカウントとの紐づけを解除できませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="manager-panel">
       <div className="section-header">
@@ -273,6 +330,24 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
                   </span>
                 </div>
                 <div className="row-actions">
+                  {!linkedPlayerId && !player.linkedUid ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleLinkPlayer(player)}
+                    >
+                      自分に紐づけ
+                    </button>
+                  ) : null}
+                  {player.linkedUid === user.uid ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleUnlinkPlayer(player)}
+                    >
+                      紐づけ解除
+                    </button>
+                  ) : null}
                   <button type="button" onClick={() => startEditing(player)}>
                     編集
                   </button>

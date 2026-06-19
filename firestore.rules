@@ -320,7 +320,17 @@ service cloud.firestore {
         ])
         && request.resource.data.playerId == resource.data.playerId
         && request.resource.data.groupId == resource.data.groupId
-        && request.resource.data.linkedUid == resource.data.linkedUid
+        && (
+          request.resource.data.linkedUid == resource.data.linkedUid
+          || (
+            resource.data.linkedUid == null
+            && request.resource.data.linkedUid == request.auth.uid
+          )
+          || (
+            resource.data.linkedUid == request.auth.uid
+            && request.resource.data.linkedUid == null
+          )
+        )
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0

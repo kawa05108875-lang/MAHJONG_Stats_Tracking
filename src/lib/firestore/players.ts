@@ -105,6 +105,16 @@ export async function updatePlayerName(params: {
   });
 }
 
+export async function updatePlayerLinkedUid(params: {
+  playerId: string;
+  linkedUid: string | null;
+}) {
+  await updateDoc(doc(getFirebaseDb(), "players", params.playerId), {
+    linkedUid: params.linkedUid,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function deleteUnusedPlayer(params: {
   groupId: string;
   playerId: string;
