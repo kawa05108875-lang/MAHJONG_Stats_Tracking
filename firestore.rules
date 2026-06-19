@@ -486,6 +486,7 @@ service cloud.firestore {
           "abortiveDrawProgression",
           "riichiPlayerIds",
           "winnerPlayerId",
+          "winnerPlayerIds",
           "loserPlayerId",
           "tenpaiPlayerIds",
           "scoreDeltas",
@@ -540,6 +541,10 @@ service cloud.firestore {
         && (
           !("winnerPlayerId" in request.resource.data)
           || request.resource.data.winnerPlayerId is string
+        )
+        && (
+          !("winnerPlayerIds" in request.resource.data)
+          || request.resource.data.winnerPlayerIds is list
         )
         && (
           !("loserPlayerId" in request.resource.data)

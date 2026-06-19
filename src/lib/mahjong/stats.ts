@@ -17,6 +17,7 @@ export type HandForStats = Pick<
   | "handType"
   | "winType"
   | "winnerPlayerId"
+  | "winnerPlayerIds"
   | "loserPlayerId"
   | "scoreDeltas"
 >;
@@ -87,7 +88,9 @@ function applyHand(stats: MutableStats, hand: HandForStats) {
     return;
   }
 
-  if (hand.winnerPlayerId === stats.playerId) {
+  const winnerPlayerIds = hand.winnerPlayerIds ?? (hand.winnerPlayerId ? [hand.winnerPlayerId] : []);
+
+  if (winnerPlayerIds.includes(stats.playerId)) {
     stats.winCount += 1;
 
     if (hand.winType === "tsumo") {

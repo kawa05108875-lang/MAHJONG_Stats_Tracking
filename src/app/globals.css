@@ -798,6 +798,10 @@ select:focus {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.secondary-win-control {
+  margin-top: 6px;
+}
+
 .segmented-control button.is-active {
   border-color: var(--primary);
   background: #eef9f6;

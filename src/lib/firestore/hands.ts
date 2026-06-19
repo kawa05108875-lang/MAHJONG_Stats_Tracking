@@ -33,6 +33,7 @@ export type HandSummary = Pick<
   | "abortiveDrawProgression"
   | "riichiPlayerIds"
   | "winnerPlayerId"
+  | "winnerPlayerIds"
   | "loserPlayerId"
   | "tenpaiPlayerIds"
   | "scoreDeltas"
@@ -51,6 +52,7 @@ export type CreateHandInput = {
   abortiveDrawProgression?: AbortiveDrawProgression;
   riichiPlayerIds: string[];
   winnerPlayerId?: string;
+  winnerPlayerIds?: string[];
   loserPlayerId?: string;
   tenpaiPlayerIds?: string[];
   scoreDeltas: ScoreDelta[];
@@ -121,6 +123,7 @@ export async function getMatchHands(groupId: string, matchId: string): Promise<H
         abortiveDrawProgression: hand.abortiveDrawProgression,
         riichiPlayerIds: hand.riichiPlayerIds,
         winnerPlayerId: hand.winnerPlayerId,
+        winnerPlayerIds: hand.winnerPlayerIds,
         loserPlayerId: hand.loserPlayerId,
         tenpaiPlayerIds: hand.tenpaiPlayerIds,
         scoreDeltas: hand.scoreDeltas,
@@ -156,6 +159,7 @@ export async function createHandAndAdvanceMatch(input: CreateHandInput) {
       ? { abortiveDrawProgression: input.abortiveDrawProgression }
       : {}),
     ...(input.winnerPlayerId ? { winnerPlayerId: input.winnerPlayerId } : {}),
+    ...(input.winnerPlayerIds ? { winnerPlayerIds: input.winnerPlayerIds } : {}),
     ...(input.loserPlayerId ? { loserPlayerId: input.loserPlayerId } : {}),
     ...(input.tenpaiPlayerIds ? { tenpaiPlayerIds: input.tenpaiPlayerIds } : {}),
   };

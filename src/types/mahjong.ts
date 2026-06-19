@@ -150,6 +150,7 @@ export type Hand = {
   abortiveDrawProgression?: AbortiveDrawProgression;
   riichiPlayerIds: string[];
   winnerPlayerId?: string;
+  winnerPlayerIds?: string[];
   loserPlayerId?: string;
   tenpaiPlayerIds?: string[];
   scoreDeltas: ScoreDelta[];

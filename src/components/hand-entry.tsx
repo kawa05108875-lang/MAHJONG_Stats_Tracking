@@ -56,6 +56,7 @@ const ABORTIVE_DRAW_PROGRESSION_OPTIONS: Array<{
   { key: "repeat", label: "同じ局で本場+1" },
   { key: "advance", label: "次の局で本場+1" },
 ];
+type RonWinnerCount = 1 | 2 | 3;
 
 function parseScore(value: string) {
   const parsed = Number(value);
@@ -65,6 +66,10 @@ function parseScore(value: string) {
 
 function playerName(match: MatchSummary, playerId: string | undefined) {
   return match.players.find((player) => player.playerId === playerId)?.name ?? "-";
+}
+
+function playerNames(match: MatchSummary, playerIds: string[] | undefined) {
+  return playerIds?.map((playerId) => playerName(match, playerId)).join(" / ") || "-";
 }
 
 function createEmptyScoreInputs(match: MatchSummary) {
@@ -154,6 +159,27 @@ function getCurrentSeatPlayers(match: MatchSummary) {
   );
 }
 
+function getUpperRonWinnerPlayerId(
+  match: MatchSummary,
+  loserPlayerId: string,
+  winnerPlayerIds: string[],
+) {
+  const loser = match.players.find((player) => player.playerId === loserPlayerId);
+
+  if (!loser || winnerPlayerIds.length === 0) {
+    return winnerPlayerIds[0];
+  }
+
+  return [...winnerPlayerIds].sort((leftPlayerId, rightPlayerId) => {
+    const left = match.players.find((player) => player.playerId === leftPlayerId);
+    const right = match.players.find((player) => player.playerId === rightPlayerId);
+    const leftDistance = left ? (loser.seatIndex - left.seatIndex + 4) % 4 : 4;
+    const rightDistance = right ? (loser.seatIndex - right.seatIndex + 4) % 4 : 4;
+
+    return leftDistance - rightDistance;
+  })[0];
+}
+
 function isLastScheduledRound(round: MatchRound, westRoundEnabled: boolean) {
   const lastWind = westRoundEnabled ? "west" : "south";
 
@@ -171,7 +197,7 @@ function playerIsTop(results: MatchFinalResult[], playerId: string | undefined) 
 function shouldFinishAfterHand(params: {
   match: MatchSummary;
   handType: HandType;
-  winnerPlayerId: string;
+  winnerPlayerIds: string[];
   nextRound: MatchRound;
   finalResults: MatchFinalResult[];
 }) {
@@ -187,7 +213,7 @@ function shouldFinishAfterHand(params: {
 
   if (agariYameEnabled && currentRoundIsFinalScheduledRound) {
     const dealerWon =
-      params.handType === "win" && params.winnerPlayerId === currentDealerPlayerId;
+      params.handType === "win" && params.winnerPlayerIds.includes(currentDealerPlayerId ?? "");
 
     if (dealerWon && playerIsTop(params.finalResults, currentDealerPlayerId)) {
       return true;
@@ -225,25 +251,34 @@ function shouldFinishAfterHand(params: {
 function calculateWinScoreDeltas(params: {
   match: MatchSummary;
   winType: WinType;
-  winnerPlayerId: string;
+  winnerPlayerIds: string[];
   loserPlayerId: string;
   riichiPlayerIds: string[];
-  ronPoint: number;
+  ronPointsByWinner: Record<string, number>;
   dealerTsumoPoint: number;
   childTsumoPoint: number;
 }) {
   const riichiStickPoint =
     (params.match.currentRiichiSticks + params.riichiPlayerIds.length) * 1000;
   const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
-  const ronPointWithHonba =
-    params.ronPoint + params.match.currentHonba * RON_HONBA_BONUS;
+  const primaryWinnerPlayerId = params.winnerPlayerIds[0] ?? "";
+  const upperRonWinnerPlayerId = getUpperRonWinnerPlayerId(
+    params.match,
+    params.loserPlayerId,
+    params.winnerPlayerIds,
+  );
+  const ronHonbaPoint = params.match.currentHonba * RON_HONBA_BONUS;
+  const ronBasePointTotal = params.winnerPlayerIds.reduce(
+    (total, playerId) => total + (params.ronPointsByWinner[playerId] ?? 0),
+    0,
+  );
   const dealerTsumoPointWithHonba =
     params.dealerTsumoPoint + params.match.currentHonba * TSUMO_HONBA_BONUS;
   const childTsumoPointWithHonba =
     params.childTsumoPoint + params.match.currentHonba * TSUMO_HONBA_BONUS;
 
   return params.match.players.map((player) => {
-    const isWinner = player.playerId === params.winnerPlayerId;
+    const isWinner = params.winnerPlayerIds.includes(player.playerId);
     const isLoser = player.playerId === params.loserPlayerId;
     const isRiichi = params.riichiPlayerIds.includes(player.playerId);
     const riichiDelta = isRiichi ? -1000 : 0;
@@ -251,16 +286,20 @@ function calculateWinScoreDeltas(params: {
 
     if (params.winType === "ron") {
       if (isWinner) {
-        handDelta = ronPointWithHonba + riichiStickPoint;
+        handDelta = params.ronPointsByWinner[player.playerId] ?? 0;
+
+        if (player.playerId === upperRonWinnerPlayerId) {
+          handDelta += ronHonbaPoint + riichiStickPoint;
+        }
       } else if (isLoser) {
-        handDelta = -ronPointWithHonba;
+        handDelta = -(ronBasePointTotal + ronHonbaPoint);
       }
     } else {
-      const winnerIsDealer = params.winnerPlayerId === currentDealerPlayerId;
+      const winnerIsDealer = primaryWinnerPlayerId === currentDealerPlayerId;
 
       if (isWinner) {
         const paymentTotal = params.match.players
-          .filter((candidate) => candidate.playerId !== params.winnerPlayerId)
+          .filter((candidate) => candidate.playerId !== primaryWinnerPlayerId)
           .reduce((total, candidate) => {
             if (winnerIsDealer) {
               return total + dealerTsumoPointWithHonba;
@@ -295,7 +334,7 @@ function calculateWinScoreDeltas(params: {
 function getNextHandProgression(params: {
   match: MatchSummary;
   handType: HandType;
-  winnerPlayerId: string;
+  winnerPlayerIds: string[];
   tenpaiPlayerIds: string[];
   abortiveDrawProgression: AbortiveDrawProgression;
 }) {
@@ -314,7 +353,7 @@ function getNextHandProgression(params: {
   const dealerRepeatRule =
     params.match.rule.dealerRepeatRule ?? "dealer-win-or-tenpai";
   const dealerWon =
-    params.handType === "win" && params.winnerPlayerId === currentDealerPlayerId;
+    params.handType === "win" && params.winnerPlayerIds.includes(currentDealerPlayerId ?? "");
   const dealerTenpaiDraw =
     params.handType === "draw" && currentDealerPlayerId
       ? params.tenpaiPlayerIds.includes(currentDealerPlayerId)
@@ -382,9 +421,12 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const [abortiveDrawType, setAbortiveDrawType] = useState<AbortiveDrawType | "">("");
   const [abortiveDrawProgression, setAbortiveDrawProgression] =
     useState<AbortiveDrawProgression>("repeat");
+  const [ronWinnerCount, setRonWinnerCount] = useState<RonWinnerCount>(1);
   const [winnerPlayerId, setWinnerPlayerId] = useState("");
+  const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([]);
   const [loserPlayerId, setLoserPlayerId] = useState("");
   const [ronPoint, setRonPoint] = useState("");
+  const [ronPointInputs, setRonPointInputs] = useState<Record<string, string>>({});
   const [dealerTsumoPoint, setDealerTsumoPoint] = useState("");
   const [childTsumoPoint, setChildTsumoPoint] = useState("");
   const [riichiPlayerIds, setRiichiPlayerIds] = useState<string[]>([]);
@@ -397,6 +439,29 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const effectiveWinnerPlayerIds = useMemo(
+    () =>
+      handType === "win" && winType === "ron" && ronWinnerCount > 1
+        ? winnerPlayerIds
+        : winnerPlayerId
+          ? [winnerPlayerId]
+          : [],
+    [handType, ronWinnerCount, winType, winnerPlayerId, winnerPlayerIds],
+  );
+  const ronPointsByWinner = useMemo(
+    () =>
+      ronWinnerCount > 1
+        ? Object.fromEntries(
+            winnerPlayerIds.map((playerId) => [
+              playerId,
+              parseScore(ronPointInputs[playerId] ?? "0"),
+            ]),
+          )
+        : winnerPlayerId
+          ? { [winnerPlayerId]: parseScore(ronPoint) }
+          : {},
+    [ronPoint, ronPointInputs, ronWinnerCount, winnerPlayerId, winnerPlayerIds],
+  );
 
   const scoreDeltas = useMemo<ScoreDelta[]>(
     () => {
@@ -404,10 +469,10 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         return calculateWinScoreDeltas({
           match,
           winType,
-          winnerPlayerId,
+          winnerPlayerIds: effectiveWinnerPlayerIds,
           loserPlayerId,
           riichiPlayerIds,
-          ronPoint: parseScore(ronPoint),
+          ronPointsByWinner,
           dealerTsumoPoint: parseScore(dealerTsumoPoint),
           childTsumoPoint: parseScore(childTsumoPoint),
         });
@@ -432,12 +497,12 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       handType,
       loserPlayerId,
       match,
+      effectiveWinnerPlayerIds,
       riichiPlayerIds,
-      ronPoint,
+      ronPointsByWinner,
       scoreInputs,
       tenpaiPlayerIds,
       winType,
-      winnerPlayerId,
     ],
   );
   const scoreDeltaTotal = scoreDeltas.reduce(
@@ -463,7 +528,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       ),
     [match.rule.abortiveDrawEnabled],
   );
-  const winnerIsDealer = winnerPlayerId === currentDealerPlayerId;
+  const winnerIsDealer = effectiveWinnerPlayerIds[0] === currentDealerPlayerId;
   const currentScores = useMemo(
     () => calculateCurrentScores(match.players, hands, match.rule.initialScore),
     [hands, match.players, match.rule.initialScore],
@@ -524,12 +589,15 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setHandTypeSelected(false);
     setHandType("win");
     setWinType("ron");
+    setRonWinnerCount(1);
     setAbortiveDrawType("");
     setAbortiveDrawProgression("repeat");
     setScoreInputs(createEmptyScoreInputs(match));
     setWinnerPlayerId("");
+    setWinnerPlayerIds([]);
     setLoserPlayerId("");
     setRonPoint("");
+    setRonPointInputs({});
     setDealerTsumoPoint("");
     setChildTsumoPoint("");
     setRiichiPlayerIds([]);
@@ -546,6 +614,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setError(null);
     setAbortiveDrawType(nextAbortiveDrawType);
     setAbortiveDrawProgression("repeat");
+    setRonWinnerCount(1);
     if (nextAbortiveDrawType === "fourRiichi") {
       setRiichiPlayerIds(currentSeatPlayers.map((player) => player.playerId));
     }
@@ -556,14 +625,48 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setHandTypeSelected(false);
     setError(null);
     setWinnerPlayerId("");
+    setWinnerPlayerIds([]);
     setLoserPlayerId("");
+    setRonWinnerCount(1);
     setAbortiveDrawType("");
     setAbortiveDrawProgression("repeat");
     setRonPoint("");
+    setRonPointInputs({});
     setDealerTsumoPoint("");
     setChildTsumoPoint("");
     setTenpaiPlayerIds([]);
     setDrawRiichiSticksConfirmed(false);
+  }
+
+  function selectRonWinnerCount(count: RonWinnerCount) {
+    setWinType("ron");
+    setRonWinnerCount(count);
+    setWinnerPlayerId("");
+    setWinnerPlayerIds([]);
+    setRonPoint("");
+    setRonPointInputs({});
+    setDealerTsumoPoint("");
+    setChildTsumoPoint("");
+  }
+
+  function toggleRonWinner(playerId: string) {
+    setWinnerPlayerIds((current) => {
+      if (current.includes(playerId)) {
+        const next = current.filter((value) => value !== playerId);
+        setRonPointInputs((inputs) => {
+          const rest = { ...inputs };
+          delete rest[playerId];
+          return rest;
+        });
+        return next;
+      }
+
+      if (current.length >= ronWinnerCount) {
+        return current;
+      }
+
+      return [...current, playerId];
+    });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -583,8 +686,18 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       return;
     }
 
-    if (handType === "win" && !winnerPlayerId) {
+    if (handType === "win" && effectiveWinnerPlayerIds.length === 0) {
       setError("和了者を選択してください。");
+      return;
+    }
+
+    if (
+      handType === "win" &&
+      winType === "ron" &&
+      ronWinnerCount > 1 &&
+      effectiveWinnerPlayerIds.length !== ronWinnerCount
+    ) {
+      setError(`${ronWinnerCount}人の和了者を選択してください。`);
       return;
     }
 
@@ -593,7 +706,20 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       return;
     }
 
-    if (handType === "win" && winType === "ron" && parseScore(ronPoint) <= 0) {
+    if (
+      handType === "win" &&
+      winType === "ron" &&
+      effectiveWinnerPlayerIds.includes(loserPlayerId)
+    ) {
+      setError("放銃者と和了者は別のプレイヤーを選択してください。");
+      return;
+    }
+
+    if (
+      handType === "win" &&
+      winType === "ron" &&
+      effectiveWinnerPlayerIds.some((playerId) => (ronPointsByWinner[playerId] ?? 0) <= 0)
+    ) {
       setError("ロンの支払い点を入力してください。");
       return;
     }
@@ -633,7 +759,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       const nextProgression = getNextHandProgression({
         match,
         handType,
-        winnerPlayerId,
+        winnerPlayerIds: effectiveWinnerPlayerIds,
         tenpaiPlayerIds,
         abortiveDrawProgression,
       });
@@ -656,7 +782,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         shouldFinishAfterHand({
           match,
           handType,
-          winnerPlayerId,
+          winnerPlayerIds: effectiveWinnerPlayerIds,
           nextRound: nextProgression.nextRound,
           finalResults: calculatedFinalResults,
         });
@@ -676,7 +802,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         abortiveDrawProgression:
           handType === "abortive-draw" ? abortiveDrawProgression : undefined,
         riichiPlayerIds,
-        winnerPlayerId: handType === "win" ? winnerPlayerId : undefined,
+        winnerPlayerId: handType === "win" ? effectiveWinnerPlayerIds[0] : undefined,
+        winnerPlayerIds: handType === "win" ? effectiveWinnerPlayerIds : undefined,
         loserPlayerId: handType === "win" && winType === "ron" ? loserPlayerId : undefined,
         tenpaiPlayerIds: handType === "draw" ? tenpaiPlayerIds : undefined,
         scoreDeltas,
@@ -805,10 +932,13 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                       <button
                         key={type}
                         type="button"
-                        className={winType === type ? "is-active" : ""}
+                        className={winType === type && (type === "tsumo" || ronWinnerCount === 1) ? "is-active" : ""}
                         onClick={() => {
                           setWinType(type);
+                          setRonWinnerCount(1);
+                          setWinnerPlayerIds([]);
                           setRonPoint("");
+                          setRonPointInputs({});
                           setDealerTsumoPoint("");
                           setChildTsumoPoint("");
                         }}
@@ -817,27 +947,47 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                       </button>
                     ))}
                   </div>
+                  <div className="segmented-control compact secondary-win-control">
+                    {([
+                      { count: 2, label: "ダブロン", enabled: match.rule.doubleRonEnabled ?? true },
+                      { count: 3, label: "トリロン", enabled: match.rule.tripleRonEnabled ?? true },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.count}
+                        type="button"
+                        className={winType === "ron" && ronWinnerCount === option.count ? "is-active" : ""}
+                        disabled={!option.enabled}
+                        onClick={() => selectRonWinnerCount(option.count)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <label className="select-field">
-                  <span>和了者</span>
-                  <select
-                    value={winnerPlayerId}
-                    onChange={(event) => {
-                      setWinnerPlayerId(event.target.value);
-                      setRonPoint("");
-                      setDealerTsumoPoint("");
-                      setChildTsumoPoint("");
-                    }}
-                  >
-                    <option value="">選択</option>
-                    {currentSeatPlayers.map((player) => (
-                      <option key={player.playerId} value={player.playerId}>
-                        {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {winType === "tsumo" || ronWinnerCount === 1 ? (
+                  <label className="select-field">
+                    <span>和了者</span>
+                    <select
+                      value={winnerPlayerId}
+                      onChange={(event) => {
+                        setWinnerPlayerId(event.target.value);
+                        setRonPoint("");
+                        setDealerTsumoPoint("");
+                        setChildTsumoPoint("");
+                      }}
+                    >
+                      <option value="">選択</option>
+                      {currentSeatPlayers
+                        .filter((player) => player.playerId !== loserPlayerId)
+                        .map((player) => (
+                          <option key={player.playerId} value={player.playerId}>
+                            {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                ) : null}
 
                 {winType === "ron" ? (
                   <>
@@ -845,11 +995,17 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                       <span>放銃者</span>
                       <select
                         value={loserPlayerId}
-                        onChange={(event) => setLoserPlayerId(event.target.value)}
+                        onChange={(event) => {
+                          const nextLoserPlayerId = event.target.value;
+                          setLoserPlayerId(nextLoserPlayerId);
+                          setWinnerPlayerIds((current) =>
+                            current.filter((playerId) => playerId !== nextLoserPlayerId),
+                          );
+                        }}
                       >
                         <option value="">選択</option>
                         {currentSeatPlayers
-                          .filter((player) => player.playerId !== winnerPlayerId)
+                          .filter((player) => !effectiveWinnerPlayerIds.includes(player.playerId))
                           .map((player) => (
                             <option key={player.playerId} value={player.playerId}>
                               {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
@@ -857,15 +1013,64 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                           ))}
                       </select>
                     </label>
-                    <label>
-                      <span className="label">ロン支払い点（素点・本場なし）</span>
-                      <input
-                        inputMode="numeric"
-                        value={ronPoint}
-                        onChange={(event) => setRonPoint(event.target.value)}
-                        placeholder="例: 8000"
-                      />
-                    </label>
+                    {ronWinnerCount === 1 ? (
+                      <label>
+                        <span className="label">ロン支払い点（素点・本場なし）</span>
+                        <input
+                          inputMode="numeric"
+                          value={ronPoint}
+                          onChange={(event) => setRonPoint(event.target.value)}
+                          placeholder="例: 8000"
+                        />
+                      </label>
+                    ) : (
+                      <>
+                        <div className="check-list">
+                          <span className="label">和了者（{ronWinnerCount}人）</span>
+                          {currentSeatPlayers.map((player) => {
+                            const checked = winnerPlayerIds.includes(player.playerId);
+                            const disabled =
+                              player.playerId === loserPlayerId ||
+                              (!checked && winnerPlayerIds.length >= ronWinnerCount);
+
+                            return (
+                              <label key={player.playerId} className="check-row">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={disabled}
+                                  onChange={() => toggleRonWinner(player.playerId)}
+                                />
+                                <span>
+                                  {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div className="score-input-grid">
+                          {winnerPlayerIds.map((playerId) => (
+                            <label key={playerId}>
+                              <span>{playerName(match, playerId)} ロン支払い点（素点・本場なし）</span>
+                              <input
+                                inputMode="numeric"
+                                value={ronPointInputs[playerId] ?? ""}
+                                onChange={(event) =>
+                                  setRonPointInputs((current) => ({
+                                    ...current,
+                                    [playerId]: event.target.value,
+                                  }))
+                                }
+                                placeholder="例: 8000"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        <p className="notice-text">
+                          本場と供託は放銃者から見た上家側の和了者に加算されます。
+                        </p>
+                      </>
+                    )}
                   </>
                 ) : winnerPlayerId ? (
                   winnerIsDealer ? (
@@ -1121,7 +1326,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               </strong>
               <span className="muted">
                 {hand.handType === "win"
-                  ? `和了: ${playerName(match, hand.winnerPlayerId)} / 放銃: ${playerName(match, hand.loserPlayerId)}`
+                  ? `和了: ${playerNames(match, hand.winnerPlayerIds ?? (hand.winnerPlayerId ? [hand.winnerPlayerId] : []))} / 放銃: ${playerName(match, hand.loserPlayerId)}`
                   : hand.handType === "draw"
                     ? `聴牌: ${(hand.tenpaiPlayerIds ?? []).map((playerId) => playerName(match, playerId)).join(" / ") || "-"}`
                     : hand.handType === "abortive-draw"
