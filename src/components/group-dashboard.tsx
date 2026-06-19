@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import type { User } from "firebase/auth";
 import { MatchCreator } from "@/components/match-creator";
 import { PlayerManager } from "@/components/player-manager";
-import { StatsDashboard } from "@/components/stats-dashboard";
+import { PlayerStatsDetail, StatsDashboard } from "@/components/stats-dashboard";
 import {
   createGroup,
   getJoinedGroups,
@@ -19,7 +19,7 @@ type GroupDashboardProps = {
   onLogout: () => Promise<void>;
 };
 
-type DashboardView = "groups" | "ranking" | "matches" | "players" | "rules";
+type DashboardView = "groups" | "ranking" | "matches" | "players" | "rules" | "playerStats";
 
 const VIEW_LABELS: Array<{ key: Exclude<DashboardView, "groups">; label: string }> = [
   { key: "ranking", label: "ランキング" },
@@ -92,6 +92,9 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<DashboardView>("groups");
+  const [selectedPlayerStatsId, setSelectedPlayerStatsId] = useState<string | null>(null);
+  const [playerStatsReturnView, setPlayerStatsReturnView] =
+    useState<DashboardView>("ranking");
   const [groupName, setGroupName] = useState("");
   const [joinGroupId, setJoinGroupId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -238,7 +241,15 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
 
   function handleSelectGroup(groupId: string) {
     setSelectedGroupId(groupId);
+    setSelectedPlayerStatsId(null);
+    setPlayerStatsReturnView("ranking");
     setActiveView("ranking");
+  }
+
+  function openPlayerStats(playerId: string) {
+    setSelectedPlayerStatsId(playerId);
+    setPlayerStatsReturnView(activeView === "players" ? "players" : "ranking");
+    setActiveView("playerStats");
   }
 
   function setRuleForm(updater: (current: RuleForm | null) => RuleForm | null) {
@@ -411,7 +422,10 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
               </div>
 
               {activeView === "ranking" ? (
-                <StatsDashboard groupId={selectedGroup.groupId} />
+                <StatsDashboard
+                  groupId={selectedGroup.groupId}
+                  onOpenPlayerStats={openPlayerStats}
+                />
               ) : null}
 
               {activeView === "matches" ? (
@@ -419,7 +433,19 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
               ) : null}
 
               {activeView === "players" ? (
-                <PlayerManager groupId={selectedGroup.groupId} user={user} />
+                <PlayerManager
+                  groupId={selectedGroup.groupId}
+                  user={user}
+                  onOpenPlayerStats={openPlayerStats}
+                />
+              ) : null}
+
+              {activeView === "playerStats" ? (
+                <PlayerStatsDetail
+                  groupId={selectedGroup.groupId}
+                  playerId={selectedPlayerStatsId}
+                  onBack={() => setActiveView(playerStatsReturnView)}
+                />
               ) : null}
 
               {activeView === "rules" ? (

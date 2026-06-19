@@ -14,6 +14,7 @@ import {
 type PlayerManagerProps = {
   groupId: string;
   user: User;
+  onOpenPlayerStats: (playerId: string) => void;
 };
 
 function notifyPlayersChanged(groupId: string) {
@@ -24,7 +25,7 @@ function notifyPlayersChanged(groupId: string) {
   );
 }
 
-export function PlayerManager({ groupId, user }: PlayerManagerProps) {
+export function PlayerManager({ groupId, user, onOpenPlayerStats }: PlayerManagerProps) {
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [name, setName] = useState("");
   const [linkToMe, setLinkToMe] = useState(false);
@@ -330,6 +331,12 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
                   </span>
                 </div>
                 <div className="row-actions player-actions">
+                  <button
+                    type="button"
+                    onClick={() => onOpenPlayerStats(player.playerId)}
+                  >
+                    成績
+                  </button>
                   {!linkedPlayerId && !player.linkedUid ? (
                     <button
                       type="button"

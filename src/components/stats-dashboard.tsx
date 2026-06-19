@@ -8,6 +8,13 @@ import {
 
 type StatsDashboardProps = {
   groupId: string;
+  onOpenPlayerStats: (playerId: string) => void;
+};
+
+type PlayerStatsDetailProps = {
+  groupId: string;
+  playerId: string | null;
+  onBack: () => void;
 };
 
 type SortKey =
@@ -85,7 +92,7 @@ function compareStats(left: PlayerStatsSummary, right: PlayerStatsSummary, sortK
   return left.name.localeCompare(right.name, "ja");
 }
 
-function selectedStatsById(
+function findStatsById(
   stats: PlayerStatsSummary[],
   selectedPlayerId: string | null,
 ) {
@@ -100,9 +107,71 @@ function sortDirectionLabel(sortKey: SortKey) {
   return "高い順";
 }
 
-export function StatsDashboard({ groupId }: StatsDashboardProps) {
+function StatsDetailCard({ playerStats }: { playerStats: PlayerStatsSummary }) {
+  return (
+    <div className="stats-detail">
+      <div className="section-header">
+        <div>
+          <p className="eyebrow">Player</p>
+          <h4>{playerStats.name}</h4>
+        </div>
+      </div>
+      <div className="metric-grid compact-metrics">
+        <div className="metric">
+          <span className="label">合計ポイント</span>
+          <strong>{formatPoint(playerStats.totalPoint)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">平均順位</span>
+          <strong>{playerStats.averageRank.toFixed(2)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">平均ポイント</span>
+          <strong>{formatPoint(playerStats.averagePoint)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">平均素点</span>
+          <strong>{playerStats.averageScore.toFixed(0)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">トップ率</span>
+          <strong>{formatRate(playerStats.firstPlaceRate)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">連対率</span>
+          <strong>{formatRate(playerStats.secondOrBetterRate)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">ラス率</span>
+          <strong>{formatRate(playerStats.fourthPlaceRate)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">和了率</span>
+          <strong>{formatRate(playerStats.winRate)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">放銃率</span>
+          <strong>{formatRate(playerStats.dealInRate)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">ツモ率</span>
+          <strong>{formatRate(playerStats.tsumoRate)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">ロン率</span>
+          <strong>{formatRate(playerStats.ronRate)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">参加局数</span>
+          <strong>{playerStats.handCount}</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function StatsDashboard({ groupId, onOpenPlayerStats }: StatsDashboardProps) {
   const [stats, setStats] = useState<PlayerStatsSummary[]>([]);
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("totalPoint");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,13 +183,6 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
     try {
       const loadedStats = await getGroupPlayerStats(groupId);
       setStats(loadedStats);
-      setSelectedPlayerId((currentPlayerId) => {
-        if (currentPlayerId && loadedStats.some((playerStats) => playerStats.playerId === currentPlayerId)) {
-          return currentPlayerId;
-        }
-
-        return loadedStats[0]?.playerId ?? null;
-      });
     } catch (loadError) {
       const message =
         loadError instanceof Error ? loadError.message : "成績の取得に失敗しました。";
@@ -163,7 +225,6 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
     () => [...stats].sort((left, right) => compareStats(left, right, sortKey)),
     [sortKey, stats],
   );
-  const selectedStats = selectedStatsById(stats, selectedPlayerId);
 
   return (
     <section className="manager-panel">
@@ -194,18 +255,15 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
       ) : null}
 
       {rankedStats.length > 0 ? (
-        <div className="stats-layout">
+        <div className="ranking-list">
+          <p className="notice-text">プレイヤーを押すと個人成績を確認できます。</p>
           <div className="ranking-list">
             {rankedStats.map((playerStats, index) => (
               <button
                 key={playerStats.playerId}
                 type="button"
-                className={
-                  playerStats.playerId === selectedPlayerId
-                    ? "ranking-row is-active"
-                    : "ranking-row"
-                }
-                onClick={() => setSelectedPlayerId(playerStats.playerId)}
+                className="ranking-row"
+                onClick={() => onOpenPlayerStats(playerStats.playerId)}
               >
                 <strong>{index + 1}</strong>
                 <span>{playerStats.name}</span>
@@ -216,70 +274,66 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
               </button>
             ))}
           </div>
-
-          {selectedStats ? (
-            <div className="stats-detail">
-              <div className="section-header">
-                <div>
-                  <p className="eyebrow">Player</p>
-                  <h4>{selectedStats.name}</h4>
-                </div>
-              </div>
-              <div className="metric-grid compact-metrics">
-                <div className="metric">
-                  <span className="label">合計ポイント</span>
-                  <strong>{formatPoint(selectedStats.totalPoint)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">平均順位</span>
-                  <strong>{selectedStats.averageRank.toFixed(2)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">平均ポイント</span>
-                  <strong>{formatPoint(selectedStats.averagePoint)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">平均素点</span>
-                  <strong>{selectedStats.averageScore.toFixed(0)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">トップ率</span>
-                  <strong>{formatRate(selectedStats.firstPlaceRate)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">連対率</span>
-                  <strong>{formatRate(selectedStats.secondOrBetterRate)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">ラス率</span>
-                  <strong>{formatRate(selectedStats.fourthPlaceRate)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">和了率</span>
-                  <strong>{formatRate(selectedStats.winRate)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">放銃率</span>
-                  <strong>{formatRate(selectedStats.dealInRate)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">ツモ率</span>
-                  <strong>{formatRate(selectedStats.tsumoRate)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">ロン率</span>
-                  <strong>{formatRate(selectedStats.ronRate)}</strong>
-                </div>
-                <div className="metric">
-                  <span className="label">参加局数</span>
-                  <strong>{selectedStats.handCount}</strong>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
+      {error ? <p className="error">{error}</p> : null}
+    </section>
+  );
+}
+
+export function PlayerStatsDetail({ groupId, playerId, onBack }: PlayerStatsDetailProps) {
+  const [stats, setStats] = useState<PlayerStatsSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      setStats(await getGroupPlayerStats(groupId));
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error ? loadError.message : "成績の取得に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "成績を取得できませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadStats();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadStats]);
+
+  const selectedStats = findStatsById(stats, playerId);
+
+  return (
+    <section className="manager-panel">
+      <div className="section-header">
+        <div>
+          <p className="eyebrow">Player Stats</p>
+          <h3>個人成績</h3>
+        </div>
+        <button type="button" onClick={onBack}>
+          戻る
+        </button>
+      </div>
+
+      {loading ? <p className="muted">成績を読み込んでいます...</p> : null}
+      {!loading && !selectedStats ? (
+        <p className="empty-state">このプレイヤーの成績が見つかりません。</p>
+      ) : null}
+      {selectedStats ? <StatsDetailCard playerStats={selectedStats} /> : null}
       {error ? <p className="error">{error}</p> : null}
     </section>
   );
