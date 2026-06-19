@@ -325,7 +325,7 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
         </div>
         <div className="user-menu">
           <span>{user.displayName ?? user.email ?? "ログイン中"}</span>
-          <button type="button" onClick={onLogout}>
+          <button type="button" className="small-utility-button" onClick={onLogout}>
             ログアウト
           </button>
         </div>
@@ -403,7 +403,11 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                   <h2>{selectedGroup.name}</h2>
                   <p className="share-code">グループID: {selectedGroup.groupId}</p>
                 </div>
-                <button type="button" onClick={() => setActiveView("groups")}>
+                <button
+                  type="button"
+                  className="small-utility-button"
+                  onClick={() => setActiveView("groups")}
+                >
                   グループ変更
                 </button>
               </div>

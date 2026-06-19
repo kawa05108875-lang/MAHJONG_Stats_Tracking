@@ -521,6 +521,20 @@ select:focus {
   white-space: nowrap;
 }
 
+.small-utility-button {
+  min-height: 32px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.small-utility-button:hover {
+  color: var(--primary-strong);
+}
+
 .danger-zone {
   display: grid;
   grid-template-columns: 1fr auto;
