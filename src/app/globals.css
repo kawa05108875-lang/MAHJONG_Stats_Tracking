@@ -157,6 +157,16 @@ button:disabled {
   background: var(--primary-strong);
 }
 
+.primary-inline-button {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.primary-inline-button:hover {
+  background: var(--primary-strong);
+}
+
 .app-frame {
   width: min(100%, 1180px);
   min-height: 100vh;
@@ -196,6 +206,10 @@ button:disabled {
   align-items: start;
 }
 
+.flow-workspace {
+  grid-template-columns: 1fr;
+}
+
 .sidebar,
 .content-area,
 .empty-panel {
@@ -216,6 +230,24 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.group-selector-panel {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.flow-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.flow-nav button.is-active {
+  border-color: var(--primary);
+  background: #eef9f6;
+  color: var(--primary-strong);
 }
 
 .form-grid {
@@ -712,6 +744,10 @@ select:focus {
 
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .flow-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .metric-grid {

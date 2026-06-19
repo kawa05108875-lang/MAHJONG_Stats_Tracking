@@ -24,6 +24,8 @@ type MatchCreatorProps = {
   user: User;
 };
 
+type MatchView = "list" | "create" | "entry";
+
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
 const DEFAULT_DEALER_REPEAT_RULE: DealerRepeatRule = "dealer-win-or-tenpai";
 
@@ -103,6 +105,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [error, setError] = useState<string | null>(null);
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [matchView, setMatchView] = useState<MatchView>("list");
 
   const selectedPlayers = useMemo(
     () =>
@@ -254,6 +257,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
       setCreatedMatchId(matchId);
       setSelectedMatchId(matchId);
+      setMatchView("entry");
       setSeatPlayerIds(["", "", "", ""]);
       await loadData();
     } catch (createError) {
@@ -317,19 +321,54 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     }
   }
 
+  function openMatch(matchId: string) {
+    setSelectedMatchId(matchId);
+    setCreatedMatchId(null);
+    setMatchView("entry");
+  }
+
+  function returnToList() {
+    setMatchView("list");
+    setCreatedMatchId(null);
+  }
+
   return (
     <section className="manager-panel">
       <div className="section-header">
         <div>
           <p className="eyebrow">Matches</p>
-          <h3>半荘作成</h3>
+          <h3>
+            {matchView === "create"
+              ? "半荘作成"
+              : matchView === "entry"
+                ? "局の結果入力"
+                : "半荘"}
+          </h3>
         </div>
-        <button type="button" onClick={loadData} disabled={loading}>
-          更新
-        </button>
+        <div className="row-actions">
+          {matchView === "list" ? (
+            <>
+              <button type="button" onClick={loadData} disabled={loading}>
+                更新
+              </button>
+              <button
+                type="button"
+                className="primary-inline-button"
+                onClick={() => setMatchView("create")}
+              >
+                新規半荘
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={returnToList}>
+              半荘一覧へ
+            </button>
+          )}
+        </div>
       </div>
 
-      <form className="match-form" onSubmit={handleCreateMatch}>
+      {matchView === "create" ? (
+        <form className="match-form" onSubmit={handleCreateMatch}>
         <p className="notice-text">
           登録済みプレイヤー: {players.length}人 / 選択中: {selectedPlayers.length}人
         </p>
@@ -519,28 +558,36 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         <button type="submit" className="primary-button" disabled={saving || !canCreateMatch}>
           半荘を開始
         </button>
-      </form>
+        </form>
+      ) : null}
 
-      {disabledReason ? <p className="notice-text">{disabledReason}</p> : null}
+      {matchView === "create" && disabledReason ? (
+        <p className="notice-text">{disabledReason}</p>
+      ) : null}
 
-      {createdMatchId ? (
-        <p className="success-text">半荘を作成しました。局入力はフェーズ6で追加します。</p>
+      {matchView === "entry" && createdMatchId ? (
+        <p className="success-text">半荘を作成しました。続けて局の結果を入力できます。</p>
       ) : null}
 
       {error ? <p className="error">{error}</p> : null}
 
-      {selectedMatch?.status === "finished" && selectedMatch.finalResults ? (
+      {matchView === "entry" &&
+      selectedMatch?.status === "finished" &&
+      selectedMatch.finalResults ? (
         <MatchResultPanel results={selectedMatch.finalResults} />
-      ) : selectedMatch ? (
+      ) : matchView === "entry" && selectedMatch ? (
         <HandEntry
           key={selectedMatch.matchId}
           match={selectedMatch}
           user={user}
           onSaved={loadData}
         />
+      ) : matchView === "entry" ? (
+        <p className="empty-state">半荘を選択してください。</p>
       ) : null}
 
-      <div className="match-list">
+      {matchView === "list" ? (
+        <div className="match-list">
         <h4>最近の半荘</h4>
         {loading ? <p className="muted">半荘を読み込んでいます...</p> : null}
         {!loading && matches.length === 0 ? (
@@ -557,7 +604,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             <span className="status-pill linked">
               {statusLabel(match.status)}
             </span>
-            <button type="button" onClick={() => setSelectedMatchId(match.matchId)}>
+            <button type="button" onClick={() => openMatch(match.matchId)}>
               {match.status === "finished" ? "結果" : "局入力"}
             </button>
             <button
@@ -570,7 +617,8 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             </button>
           </div>
         ))}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }
