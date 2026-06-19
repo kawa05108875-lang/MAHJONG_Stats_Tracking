@@ -120,6 +120,8 @@ export type Match = {
   matchId: string;
   groupId: string;
   date: string;
+  matchBlockId?: string;
+  matchBlockNumber?: number;
   status: MatchStatus;
   players: MatchPlayer[];
   dealerPlayerId: string;

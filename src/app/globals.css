@@ -632,6 +632,35 @@ select:focus {
   font-size: 1rem;
 }
 
+.match-block {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.match-block-header {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.match-block-header > div:first-child {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.match-block-list {
+  display: grid;
+  gap: 6px;
+}
+
 .match-row {
   display: flex;
   align-items: center;

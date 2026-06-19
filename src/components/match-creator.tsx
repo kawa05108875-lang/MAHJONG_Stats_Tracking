@@ -24,11 +24,28 @@ type MatchCreatorProps = {
 
 type MatchView = "list" | "create" | "entry";
 type NextMatchMode = "rotate" | "shuffle";
+type MatchBlockPlayerTotal = {
+  playerId: string;
+  name: string;
+  totalPoint: number;
+  finishedMatchCount: number;
+};
+type MatchBlockSummary = {
+  blockId: string;
+  matches: MatchSummary[];
+  dateLabel: string;
+  finishedMatchCount: number;
+  playerTotals: MatchBlockPlayerTotal[];
+};
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function timestampSeconds(timestamp: MatchSummary["createdAt"]) {
+  return "seconds" in timestamp ? timestamp.seconds : 0;
 }
 
 function normalizeMatchPlayers(players: MatchPlayer[]) {
@@ -143,6 +160,103 @@ function formatRecentResults(results: MatchFinalResult[] | null) {
     }));
 }
 
+function matchBlockId(match: MatchSummary) {
+  return match.matchBlockId ?? `legacy-${match.matchId}`;
+}
+
+function matchNumberLabel(match: MatchSummary, index: number) {
+  return `${match.matchBlockNumber ?? index + 1}半荘目`;
+}
+
+function createDateRangeLabel(matches: MatchSummary[]) {
+  const dates = [...new Set(matches.map((match) => match.date))].sort();
+
+  if (dates.length === 0) {
+    return "-";
+  }
+
+  if (dates[0] === dates[dates.length - 1]) {
+    return dates[0];
+  }
+
+  return `${dates[0]} - ${dates[dates.length - 1]}`;
+}
+
+function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[] {
+  const blocksById = new Map<string, MatchSummary[]>();
+
+  for (const match of matches) {
+    const blockId = matchBlockId(match);
+    const blockMatches = blocksById.get(blockId) ?? [];
+    blockMatches.push(match);
+    blocksById.set(blockId, blockMatches);
+  }
+
+  return Array.from(blocksById.entries())
+    .map(([blockId, blockMatches]) => {
+      const sortedMatches = [...blockMatches].sort((left, right) => {
+        const numberDiff =
+          (left.matchBlockNumber ?? Number.MAX_SAFE_INTEGER) -
+          (right.matchBlockNumber ?? Number.MAX_SAFE_INTEGER);
+
+        if (numberDiff !== 0) {
+          return numberDiff;
+        }
+
+        const dateDiff = left.date.localeCompare(right.date);
+
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+
+        return timestampSeconds(left.createdAt) - timestampSeconds(right.createdAt);
+      });
+      const playerTotals = new Map<string, MatchBlockPlayerTotal>();
+
+      for (const match of sortedMatches) {
+        for (const result of match.finalResults ?? []) {
+          const current = playerTotals.get(result.playerId) ?? {
+            playerId: result.playerId,
+            name: result.name,
+            totalPoint: 0,
+            finishedMatchCount: 0,
+          };
+
+          current.totalPoint += result.totalPoint;
+          current.finishedMatchCount += 1;
+          playerTotals.set(result.playerId, current);
+        }
+      }
+
+      return {
+        blockId,
+        matches: sortedMatches,
+        dateLabel: createDateRangeLabel(sortedMatches),
+        finishedMatchCount: sortedMatches.filter((match) => match.status === "finished").length,
+        playerTotals: Array.from(playerTotals.values()).sort((left, right) => {
+          const pointDiff = right.totalPoint - left.totalPoint;
+
+          if (pointDiff !== 0) {
+            return pointDiff;
+          }
+
+          return left.name.localeCompare(right.name, "ja");
+        }),
+      };
+    })
+    .sort((left, right) => {
+      const leftLatest = left.matches[left.matches.length - 1];
+      const rightLatest = right.matches[right.matches.length - 1];
+      const dateDiff = rightLatest.date.localeCompare(leftLatest.date);
+
+      if (dateDiff !== 0) {
+        return dateDiff;
+      }
+
+      return timestampSeconds(rightLatest.createdAt) - timestampSeconds(leftLatest.createdAt);
+    });
+}
+
 function MatchResultPanel({
   results,
   rotateNotice,
@@ -249,6 +363,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     () => matches.find((match) => match.matchId === selectedMatchId) ?? null,
     [matches, selectedMatchId],
   );
+  const matchBlocks = useMemo(() => createMatchBlockSummaries(matches), [matches]);
   const recentSamePlayerMatchCount = useMemo(
     () => countRecentRotatedMatches(matches, selectedMatch),
     [matches, selectedMatch],
@@ -454,9 +569,15 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     try {
       const nextPlayers =
         mode === "rotate" ? rotateDealer(selectedMatch.players) : shuffleSeats(selectedMatch.players);
+      const currentBlockId = matchBlockId(selectedMatch);
+      const currentBlockMatchCount = matches.filter(
+        (match) => matchBlockId(match) === currentBlockId,
+      ).length;
       const matchId = await createMatch({
         groupId: group.groupId,
         date: todayString(),
+        matchBlockId: currentBlockId,
+        matchBlockNumber: currentBlockMatchCount + 1,
         players: nextPlayers,
         dealerPlayerId: nextPlayers[0].playerId,
         rule: group.defaultRule,
@@ -632,50 +753,73 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
       {matchView === "list" ? (
         <div className="match-list">
-        <h4>最近の半荘</h4>
+        <h4>対局ブロック</h4>
         {loading ? <p className="muted">半荘を読み込んでいます...</p> : null}
         {!loading && matches.length === 0 ? (
           <p className="empty-state">まだ半荘がありません。</p>
         ) : null}
-        {matches.slice(0, 5).map((match) => {
-          const recentResults = formatRecentResults(match.finalResults);
-
-          return (
-            <div key={match.matchId} className="match-row">
+        {matchBlocks.slice(0, 5).map((block) => (
+          <section key={block.blockId} className="match-block">
+            <div className="match-block-header">
               <div>
-                <strong>{match.date}</strong>
+                <strong>{block.dateLabel}</strong>
                 <span className="muted">
-                  {match.players.map((player) => player.name).join(" / ")}
+                  {block.matches.length}半荘 / 終了 {block.finishedMatchCount}半荘
                 </span>
-                {recentResults.length > 0 ? (
-                  <div className="match-result-summary">
-                    {recentResults.map((result) => (
-                      <span key={result.playerId}>{result.label}</span>
-                    ))}
-                  </div>
-                ) : null}
               </div>
-              <span className="status-pill linked">
-                {statusLabel(match.status)}
-              </span>
-              <button
-                type="button"
-                className="compact-action-button"
-                onClick={() => openMatch(match.matchId)}
-              >
-                {match.status === "finished" ? "結果" : "局入力"}
-              </button>
-              <button
-                type="button"
-                className="compact-action-button danger-button"
-                onClick={() => void handleDeleteMatch(match)}
-                disabled={deletingMatchId === match.matchId}
-              >
-                {deletingMatchId === match.matchId ? "削除中..." : "削除"}
-              </button>
+              {block.playerTotals.length > 0 ? (
+                <div className="match-result-summary">
+                  {block.playerTotals.map((playerTotal) => (
+                    <span key={playerTotal.playerId}>
+                      {playerTotal.name} {playerTotal.totalPoint.toFixed(1)}pt
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          );
-        })}
+            <div className="match-block-list">
+              {block.matches.map((match, index) => {
+                const recentResults = formatRecentResults(match.finalResults);
+
+                return (
+                  <div key={match.matchId} className="match-row">
+                    <div>
+                      <strong>{matchNumberLabel(match, index)} / {match.date}</strong>
+                      <span className="muted">
+                        {match.players.map((player) => player.name).join(" / ")}
+                      </span>
+                      {recentResults.length > 0 ? (
+                        <div className="match-result-summary">
+                          {recentResults.map((result) => (
+                            <span key={result.playerId}>{result.label}</span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    <span className="status-pill linked">
+                      {statusLabel(match.status)}
+                    </span>
+                    <button
+                      type="button"
+                      className="compact-action-button"
+                      onClick={() => openMatch(match.matchId)}
+                    >
+                      {match.status === "finished" ? "結果" : "局入力"}
+                    </button>
+                    <button
+                      type="button"
+                      className="compact-action-button danger-button"
+                      onClick={() => void handleDeleteMatch(match)}
+                      disabled={deletingMatchId === match.matchId}
+                    >
+                      {deletingMatchId === match.matchId ? "削除中..." : "削除"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
         </div>
       ) : null}
     </section>

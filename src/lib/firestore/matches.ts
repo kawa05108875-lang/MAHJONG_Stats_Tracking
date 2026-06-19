@@ -16,6 +16,8 @@ export type MatchSummary = Pick<
   | "matchId"
   | "groupId"
   | "date"
+  | "matchBlockId"
+  | "matchBlockNumber"
   | "status"
   | "players"
   | "dealerPlayerId"
@@ -30,6 +32,8 @@ export type MatchSummary = Pick<
 export async function createMatch(params: {
   groupId: string;
   date: string;
+  matchBlockId?: string;
+  matchBlockNumber?: number;
   players: MatchPlayer[];
   dealerPlayerId: string;
   rule: MatchRule;
@@ -44,6 +48,8 @@ export async function createMatch(params: {
     matchId: matchRef.id,
     groupId: params.groupId,
     date: params.date,
+    matchBlockId: params.matchBlockId ?? matchRef.id,
+    matchBlockNumber: params.matchBlockNumber ?? 1,
     status: "inputting",
     players: params.players,
     dealerPlayerId: params.dealerPlayerId,
@@ -82,6 +88,8 @@ export async function getGroupMatches(groupId: string): Promise<MatchSummary[]> 
         matchId: match.matchId,
         groupId: match.groupId,
         date: match.date,
+        matchBlockId: match.matchBlockId,
+        matchBlockNumber: match.matchBlockNumber,
         status: match.status,
         players: match.players,
         dealerPlayerId: match.dealerPlayerId,

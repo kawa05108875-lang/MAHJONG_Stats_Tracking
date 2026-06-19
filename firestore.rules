@@ -357,6 +357,8 @@ service cloud.firestore {
           "matchId",
           "groupId",
           "date",
+          "matchBlockId",
+          "matchBlockNumber",
           "status",
           "players",
           "dealerPlayerId",
@@ -374,6 +376,8 @@ service cloud.firestore {
           "matchId",
           "groupId",
           "date",
+          "matchBlockId",
+          "matchBlockNumber",
           "status",
           "players",
           "dealerPlayerId",
@@ -389,6 +393,9 @@ service cloud.firestore {
         ])
         && request.resource.data.matchId == matchId
         && request.resource.data.date is string
+        && request.resource.data.matchBlockId is string
+        && request.resource.data.matchBlockNumber is number
+        && request.resource.data.matchBlockNumber >= 1
         && request.resource.data.status == "inputting"
         && request.resource.data.players is list
         && request.resource.data.players.size() == 4
@@ -409,6 +416,8 @@ service cloud.firestore {
           "matchId",
           "groupId",
           "date",
+          "matchBlockId",
+          "matchBlockNumber",
           "status",
           "players",
           "dealerPlayerId",
@@ -425,6 +434,14 @@ service cloud.firestore {
         && request.resource.data.matchId == resource.data.matchId
         && request.resource.data.groupId == resource.data.groupId
         && request.resource.data.date == resource.data.date
+        && (
+          !("matchBlockId" in resource.data)
+          || request.resource.data.matchBlockId == resource.data.matchBlockId
+        )
+        && (
+          !("matchBlockNumber" in resource.data)
+          || request.resource.data.matchBlockNumber == resource.data.matchBlockNumber
+        )
         && request.resource.data.players == resource.data.players
         && request.resource.data.dealerPlayerId == resource.data.dealerPlayerId
         && request.resource.data.rule == resource.data.rule
