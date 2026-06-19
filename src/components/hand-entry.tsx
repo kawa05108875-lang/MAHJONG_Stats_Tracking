@@ -738,7 +738,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                   </select>
                 </label>
                 <label>
-                  <span className="label">ロン支払い点（粗点・本場なし）</span>
+                  <span className="label">ロン支払い点（素点・本場なし）</span>
                   <input
                     inputMode="numeric"
                     value={ronPoint}
@@ -750,7 +750,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             ) : winnerPlayerId ? (
               winnerIsDealer ? (
                 <label>
-                  <span className="label">親ツモ 各自支払い点（粗点・本場なし）</span>
+                  <span className="label">親ツモ 各自支払い点（素点・本場なし）</span>
                   <input
                     inputMode="numeric"
                     value={dealerTsumoPoint}
@@ -761,7 +761,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               ) : (
                 <div className="score-input-grid">
                   <label>
-                    <span>子ツモ 親支払い点（粗点・本場なし）</span>
+                    <span>子ツモ 親支払い点（素点・本場なし）</span>
                     <input
                       inputMode="numeric"
                       value={dealerTsumoPoint}
@@ -770,7 +770,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                     />
                   </label>
                   <label>
-                    <span>子ツモ 子支払い点（粗点・本場なし）</span>
+                    <span>子ツモ 子支払い点（素点・本場なし）</span>
                     <input
                       inputMode="numeric"
                       value={childTsumoPoint}
@@ -785,7 +785,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             <div className="notice">
               <strong>本場は自動加算</strong>
               <span>
-                入力するのは粗点の支払い点だけです。{match.currentHonba}本場なので、
+                入力するのは素点の支払い点だけです。{match.currentHonba}本場なので、
                 ロンは放銃者の支払いに+{ronHonbaBonus.toLocaleString()}点、ツモは各家の支払いに+
                 {tsumoHonbaBonus.toLocaleString()}点を自動で足します。
               </span>
