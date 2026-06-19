@@ -31,7 +31,7 @@ const ABORTIVE_DRAW_LABELS: Array<{ key: AbortiveDrawType; label: string }> = [
   { key: "nineTerminals", label: "九種九牌" },
   { key: "fourWinds", label: "四風連打" },
   { key: "fourRiichi", label: "四家立直" },
-  { key: "fourKan", label: "四カン流れ" },
+  { key: "fourKan", label: "四槓散了" },
 ];
 
 function formatUma(group: GroupSummary) {
@@ -338,6 +338,18 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                       <span className="label">上がりやめ</span>
                       <strong>
                         {selectedGroup.defaultRule.agariYameEnabled ?? true ? "あり" : "なし"}
+                      </strong>
+                    </div>
+                    <div className="metric">
+                      <span className="label">ダブロン</span>
+                      <strong>
+                        {selectedGroup.defaultRule.doubleRonEnabled ?? true ? "あり" : "なし"}
+                      </strong>
+                    </div>
+                    <div className="metric">
+                      <span className="label">トリロン</span>
+                      <strong>
+                        {selectedGroup.defaultRule.tripleRonEnabled ?? true ? "あり" : "なし"}
                       </strong>
                     </div>
                     <div className="metric">

@@ -47,7 +47,7 @@ const ABORTIVE_DRAW_OPTIONS: Array<{ key: AbortiveDrawType; label: string }> = [
   { key: "nineTerminals", label: "九種九牌" },
   { key: "fourWinds", label: "四風連打" },
   { key: "fourRiichi", label: "四家立直" },
-  { key: "fourKan", label: "四カン流れ" },
+  { key: "fourKan", label: "四槓散了" },
 ];
 const ABORTIVE_DRAW_PROGRESSION_OPTIONS: Array<{
   key: AbortiveDrawProgression;

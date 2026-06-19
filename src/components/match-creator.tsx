@@ -33,7 +33,7 @@ const ABORTIVE_DRAW_OPTIONS: Array<{ key: AbortiveDrawType; label: string }> = [
   { key: "nineTerminals", label: "九種九牌" },
   { key: "fourWinds", label: "四風連打" },
   { key: "fourRiichi", label: "四家立直" },
-  { key: "fourKan", label: "四カン流れ" },
+  { key: "fourKan", label: "四槓散了" },
 ];
 
 function todayString() {
@@ -58,6 +58,8 @@ function createRuleForm(rule: MatchRule) {
     dealerRepeatRule: rule.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
     agariYameEnabled: rule.agariYameEnabled ?? true,
     westRoundEnabled: rule.westRoundEnabled ?? false,
+    doubleRonEnabled: rule.doubleRonEnabled ?? true,
+    tripleRonEnabled: rule.tripleRonEnabled ?? true,
     abortiveDrawEnabled: {
       nineTerminals: rule.abortiveDrawEnabled?.nineTerminals ?? true,
       fourWinds: rule.abortiveDrawEnabled?.fourWinds ?? true,
@@ -243,6 +245,8 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       dealerRepeatRule: ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
       agariYameEnabled: ruleForm.agariYameEnabled,
       westRoundEnabled: ruleForm.westRoundEnabled,
+      doubleRonEnabled: ruleForm.doubleRonEnabled,
+      tripleRonEnabled: ruleForm.tripleRonEnabled,
       abortiveDrawEnabled: ruleForm.abortiveDrawEnabled,
     };
   }
@@ -576,6 +580,38 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
           >
             <option value="enabled">あり: 最終局の親がトップで和了したら終了</option>
             <option value="disabled">なし: 親が和了したら連荘</option>
+          </select>
+        </label>
+
+        <label className="select-field">
+          <span>ダブロン</span>
+          <select
+            value={ruleForm.doubleRonEnabled ? "enabled" : "disabled"}
+            onChange={(event) =>
+              setRuleForm((current) => ({
+                ...current,
+                doubleRonEnabled: event.target.value === "enabled",
+              }))
+            }
+          >
+            <option value="enabled">あり</option>
+            <option value="disabled">なし</option>
+          </select>
+        </label>
+
+        <label className="select-field">
+          <span>トリロン</span>
+          <select
+            value={ruleForm.tripleRonEnabled ? "enabled" : "disabled"}
+            onChange={(event) =>
+              setRuleForm((current) => ({
+                ...current,
+                tripleRonEnabled: event.target.value === "enabled",
+              }))
+            }
+          >
+            <option value="enabled">あり</option>
+            <option value="disabled">なし</option>
           </select>
         </label>
 

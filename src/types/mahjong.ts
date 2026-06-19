@@ -62,6 +62,8 @@ export type MatchRule = {
   agariYameEnabled?: boolean;
   westRoundEnabled?: boolean;
   abortiveDrawEnabled?: AbortiveDrawRule;
+  doubleRonEnabled?: boolean;
+  tripleRonEnabled?: boolean;
 };
 
 export type Group = {
@@ -203,4 +205,6 @@ export const DEFAULT_MATCH_RULE: MatchRule = {
     fourRiichi: true,
     fourKan: true,
   },
+  doubleRonEnabled: true,
+  tripleRonEnabled: true,
 };
