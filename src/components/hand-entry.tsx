@@ -173,8 +173,13 @@ function getUpperRonWinnerPlayerId(
   return [...winnerPlayerIds].sort((leftPlayerId, rightPlayerId) => {
     const left = match.players.find((player) => player.playerId === leftPlayerId);
     const right = match.players.find((player) => player.playerId === rightPlayerId);
-    const leftDistance = left ? (loser.seatIndex - left.seatIndex + 4) % 4 : 4;
-    const rightDistance = right ? (loser.seatIndex - right.seatIndex + 4) % 4 : 4;
+    const loserHouseIndex = getCurrentHouseIndex(match, loser.seatIndex);
+    const leftDistance = left
+      ? (getCurrentHouseIndex(match, left.seatIndex) - loserHouseIndex + 4) % 4
+      : 4;
+    const rightDistance = right
+      ? (getCurrentHouseIndex(match, right.seatIndex) - loserHouseIndex + 4) % 4
+      : 4;
 
     return leftDistance - rightDistance;
   })[0];
