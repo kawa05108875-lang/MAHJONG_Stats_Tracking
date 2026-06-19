@@ -12,11 +12,8 @@ import { deleteMatchData } from "@/lib/firestore/maintenance";
 import { getGroupPlayers, type PlayerSummary } from "@/lib/firestore/players";
 import type { GroupSummary } from "@/lib/firestore/groups";
 import type {
-  AbortiveDrawType,
-  DealerRepeatRule,
   MatchFinalResult,
   MatchPlayer,
-  MatchRule,
   SeatIndex,
 } from "@/types";
 
@@ -28,45 +25,9 @@ type MatchCreatorProps = {
 type MatchView = "list" | "create" | "entry";
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
-const DEFAULT_DEALER_REPEAT_RULE: DealerRepeatRule = "dealer-win-or-tenpai";
-const ABORTIVE_DRAW_OPTIONS: Array<{ key: AbortiveDrawType; label: string }> = [
-  { key: "nineTerminals", label: "九種九牌" },
-  { key: "fourWinds", label: "四風連打" },
-  { key: "fourRiichi", label: "四家立直" },
-  { key: "fourKan", label: "四槓散了" },
-];
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function parseNumber(value: string, fallback: number) {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function createRuleForm(rule: MatchRule) {
-  return {
-    initialScore: String(rule.initialScore),
-    returnScore: String(rule.returnScore),
-    umaFirst: String(rule.uma.first),
-    umaSecond: String(rule.uma.second),
-    umaThird: String(rule.uma.third),
-    umaFourth: String(rule.uma.fourth),
-    bankruptcyEnabled: rule.bankruptcyEnabled,
-    dealerRepeatRule: rule.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
-    agariYameEnabled: rule.agariYameEnabled ?? true,
-    westRoundEnabled: rule.westRoundEnabled ?? false,
-    doubleRonEnabled: rule.doubleRonEnabled ?? true,
-    tripleRonEnabled: rule.tripleRonEnabled ?? true,
-    abortiveDrawEnabled: {
-      nineTerminals: rule.abortiveDrawEnabled?.nineTerminals ?? true,
-      fourWinds: rule.abortiveDrawEnabled?.fourWinds ?? true,
-      fourRiichi: rule.abortiveDrawEnabled?.fourRiichi ?? true,
-      fourKan: rule.abortiveDrawEnabled?.fourKan ?? true,
-    },
-  };
 }
 
 function statusLabel(status: MatchSummary["status"]) {
@@ -113,7 +74,6 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [matches, setMatches] = useState<MatchSummary[]>([]);
   const [date, setDate] = useState(todayString());
   const [seatPlayerIds, setSeatPlayerIds] = useState<string[]>(["", "", "", ""]);
-  const [ruleForm, setRuleForm] = useState(() => createRuleForm(group.defaultRule));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
@@ -230,37 +190,6 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     });
   }
 
-  function buildRule(): MatchRule {
-    return {
-      initialScore: parseNumber(ruleForm.initialScore, group.defaultRule.initialScore),
-      returnScore: parseNumber(ruleForm.returnScore, group.defaultRule.returnScore),
-      uma: {
-        first: parseNumber(ruleForm.umaFirst, group.defaultRule.uma.first),
-        second: parseNumber(ruleForm.umaSecond, group.defaultRule.uma.second),
-        third: parseNumber(ruleForm.umaThird, group.defaultRule.uma.third),
-        fourth: parseNumber(ruleForm.umaFourth, group.defaultRule.uma.fourth),
-      },
-      bankruptcyEnabled: ruleForm.bankruptcyEnabled,
-      tieBreak: group.defaultRule.tieBreak,
-      dealerRepeatRule: ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
-      agariYameEnabled: ruleForm.agariYameEnabled,
-      westRoundEnabled: ruleForm.westRoundEnabled,
-      doubleRonEnabled: ruleForm.doubleRonEnabled,
-      tripleRonEnabled: ruleForm.tripleRonEnabled,
-      abortiveDrawEnabled: ruleForm.abortiveDrawEnabled,
-    };
-  }
-
-  function updateAbortiveDrawRule(key: AbortiveDrawType, enabled: boolean) {
-    setRuleForm((current) => ({
-      ...current,
-      abortiveDrawEnabled: {
-        ...current.abortiveDrawEnabled,
-        [key]: enabled,
-      },
-    }));
-  }
-
   async function handleCreateMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -279,7 +208,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         date,
         players: selectedPlayers,
         dealerPlayerId: seatPlayerIds[0],
-        rule: buildRule(),
+        rule: group.defaultRule,
         uid: user.uid,
       });
 
@@ -436,198 +365,6 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         </div>
 
         <p className="notice-text">起家は東家として保存されます。</p>
-
-        <div className="rule-grid">
-          <label>
-            <span>開始点</span>
-            <input
-              inputMode="numeric"
-              value={ruleForm.initialScore}
-              onChange={(event) =>
-                setRuleForm((current) => ({
-                  ...current,
-                  initialScore: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <label>
-            <span>返し点</span>
-            <input
-              inputMode="numeric"
-              value={ruleForm.returnScore}
-              onChange={(event) =>
-                setRuleForm((current) => ({
-                  ...current,
-                  returnScore: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <label>
-            <span>ウマ 1着</span>
-            <input
-              inputMode="numeric"
-              value={ruleForm.umaFirst}
-              onChange={(event) =>
-                setRuleForm((current) => ({
-                  ...current,
-                  umaFirst: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <label>
-            <span>ウマ 2着</span>
-            <input
-              inputMode="numeric"
-              value={ruleForm.umaSecond}
-              onChange={(event) =>
-                setRuleForm((current) => ({
-                  ...current,
-                  umaSecond: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <label>
-            <span>ウマ 3着</span>
-            <input
-              inputMode="numeric"
-              value={ruleForm.umaThird}
-              onChange={(event) =>
-                setRuleForm((current) => ({
-                  ...current,
-                  umaThird: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <label>
-            <span>ウマ 4着</span>
-            <input
-              inputMode="numeric"
-              value={ruleForm.umaFourth}
-              onChange={(event) =>
-                setRuleForm((current) => ({
-                  ...current,
-                  umaFourth: event.target.value,
-                }))
-              }
-            />
-          </label>
-        </div>
-
-        <label className="select-field">
-          <span>トビ終了</span>
-          <select
-            value={ruleForm.bankruptcyEnabled ? "enabled" : "disabled"}
-            onChange={(event) =>
-              setRuleForm((current) => ({
-                ...current,
-                bankruptcyEnabled: event.target.value === "enabled",
-              }))
-            }
-          >
-            <option value="enabled">飛びあり: 誰かが飛んだら終了</option>
-            <option value="disabled">飛びなし: 誰かが飛んでも続行</option>
-          </select>
-        </label>
-
-        <label className="select-field">
-          <span>連荘ルール</span>
-          <select
-            value={ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE}
-            onChange={(event) =>
-              setRuleForm((current) => ({
-                ...current,
-                dealerRepeatRule: event.target.value as DealerRepeatRule,
-              }))
-            }
-          >
-            <option value="dealer-win-or-tenpai">親和了・親テンパイ流局で連荘</option>
-            <option value="dealer-win">親和了のみ連荘</option>
-            <option value="always">流局は親テンパイに関係なく連荘</option>
-          </select>
-        </label>
-
-        <label className="select-field">
-          <span>西入</span>
-          <select
-            value={ruleForm.westRoundEnabled ? "enabled" : "disabled"}
-            onChange={(event) =>
-              setRuleForm((current) => ({
-                ...current,
-                westRoundEnabled: event.target.value === "enabled",
-              }))
-            }
-          >
-            <option value="enabled">あり: 南4局終了時に誰も返し点未満なら西入</option>
-            <option value="disabled">なし: 南4局で半荘終了</option>
-          </select>
-        </label>
-
-        <label className="select-field">
-          <span>上がりやめ</span>
-          <select
-            value={ruleForm.agariYameEnabled ? "enabled" : "disabled"}
-            onChange={(event) =>
-              setRuleForm((current) => ({
-                ...current,
-                agariYameEnabled: event.target.value === "enabled",
-              }))
-            }
-          >
-            <option value="enabled">あり: 最終局の親がトップで和了したら終了</option>
-            <option value="disabled">なし: 親が和了したら連荘</option>
-          </select>
-        </label>
-
-        <label className="select-field">
-          <span>ダブロン</span>
-          <select
-            value={ruleForm.doubleRonEnabled ? "enabled" : "disabled"}
-            onChange={(event) =>
-              setRuleForm((current) => ({
-                ...current,
-                doubleRonEnabled: event.target.value === "enabled",
-              }))
-            }
-          >
-            <option value="enabled">あり</option>
-            <option value="disabled">なし</option>
-          </select>
-        </label>
-
-        <label className="select-field">
-          <span>トリロン</span>
-          <select
-            value={ruleForm.tripleRonEnabled ? "enabled" : "disabled"}
-            onChange={(event) =>
-              setRuleForm((current) => ({
-                ...current,
-                tripleRonEnabled: event.target.value === "enabled",
-              }))
-            }
-          >
-            <option value="enabled">あり</option>
-            <option value="disabled">なし</option>
-          </select>
-        </label>
-
-        <div className="check-list">
-          <span className="label">途中流局</span>
-          {ABORTIVE_DRAW_OPTIONS.map((option) => (
-            <label key={option.key} className="check-row">
-              <input
-                type="checkbox"
-                checked={ruleForm.abortiveDrawEnabled[option.key]}
-                onChange={(event) => updateAbortiveDrawRule(option.key, event.target.checked)}
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </div>
 
         <button type="submit" className="primary-button" disabled={saving || !canCreateMatch}>
           半荘を開始

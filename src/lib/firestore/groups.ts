@@ -5,11 +5,12 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
-import { DEFAULT_MATCH_RULE, type Group, type GroupMember } from "@/types";
+import { DEFAULT_MATCH_RULE, type Group, type GroupMember, type MatchRule } from "@/types";
 
 export type GroupSummary = Pick<
   Group,
@@ -118,4 +119,17 @@ export async function getJoinedGroups(uid: string): Promise<GroupSummary[]> {
   );
 
   return joinedGroups.sort((left, right) => left.name.localeCompare(right.name, "ja"));
+}
+
+export async function updateGroupDefaultRule(params: {
+  groupId: string;
+  defaultRule: MatchRule;
+}) {
+  const db = getFirebaseDb();
+  const groupRef = doc(db, "groups", params.groupId);
+
+  await updateDoc(groupRef, {
+    defaultRule: params.defaultRule,
+    updatedAt: serverTimestamp(),
+  });
 }

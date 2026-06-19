@@ -9,9 +9,10 @@ import {
   createGroup,
   getJoinedGroups,
   joinGroup,
+  updateGroupDefaultRule,
   type GroupSummary,
 } from "@/lib/firestore/groups";
-import type { AbortiveDrawType } from "@/types";
+import type { AbortiveDrawType, DealerRepeatRule, MatchRule } from "@/types";
 
 type GroupDashboardProps = {
   user: User;
@@ -27,6 +28,7 @@ const VIEW_LABELS: Array<{ key: Exclude<DashboardView, "groups">; label: string 
   { key: "rules", label: "ルール" },
 ];
 
+const DEFAULT_DEALER_REPEAT_RULE: DealerRepeatRule = "dealer-win-or-tenpai";
 const ABORTIVE_DRAW_LABELS: Array<{ key: AbortiveDrawType; label: string }> = [
   { key: "nineTerminals", label: "九種九牌" },
   { key: "fourWinds", label: "四風連打" },
@@ -34,18 +36,56 @@ const ABORTIVE_DRAW_LABELS: Array<{ key: AbortiveDrawType; label: string }> = [
   { key: "fourKan", label: "四槓散了" },
 ];
 
-function formatUma(group: GroupSummary) {
-  const { first, second, third, fourth } = group.defaultRule.uma;
+type RuleForm = ReturnType<typeof createRuleForm>;
 
-  return `${first >= 0 ? "+" : ""}${first} / ${second >= 0 ? "+" : ""}${second} / ${third} / ${fourth}`;
+function parseNumber(value: string, fallback: number) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function formatAbortiveDrawRules(group: GroupSummary) {
-  const enabledRules = ABORTIVE_DRAW_LABELS.filter(
-    (rule) => group.defaultRule.abortiveDrawEnabled?.[rule.key] ?? true,
-  ).map((rule) => rule.label);
+function createRuleForm(rule: MatchRule) {
+  return {
+    initialScore: String(rule.initialScore),
+    returnScore: String(rule.returnScore),
+    umaFirst: String(rule.uma.first),
+    umaSecond: String(rule.uma.second),
+    umaThird: String(rule.uma.third),
+    umaFourth: String(rule.uma.fourth),
+    bankruptcyEnabled: rule.bankruptcyEnabled,
+    dealerRepeatRule: rule.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
+    agariYameEnabled: rule.agariYameEnabled ?? true,
+    westRoundEnabled: rule.westRoundEnabled ?? false,
+    doubleRonEnabled: rule.doubleRonEnabled ?? true,
+    tripleRonEnabled: rule.tripleRonEnabled ?? true,
+    abortiveDrawEnabled: {
+      nineTerminals: rule.abortiveDrawEnabled?.nineTerminals ?? true,
+      fourWinds: rule.abortiveDrawEnabled?.fourWinds ?? true,
+      fourRiichi: rule.abortiveDrawEnabled?.fourRiichi ?? true,
+      fourKan: rule.abortiveDrawEnabled?.fourKan ?? true,
+    },
+  };
+}
 
-  return enabledRules.length > 0 ? enabledRules.join(" / ") : "なし";
+function buildRule(ruleForm: RuleForm, fallbackRule: MatchRule): MatchRule {
+  return {
+    initialScore: parseNumber(ruleForm.initialScore, fallbackRule.initialScore),
+    returnScore: parseNumber(ruleForm.returnScore, fallbackRule.returnScore),
+    uma: {
+      first: parseNumber(ruleForm.umaFirst, fallbackRule.uma.first),
+      second: parseNumber(ruleForm.umaSecond, fallbackRule.uma.second),
+      third: parseNumber(ruleForm.umaThird, fallbackRule.uma.third),
+      fourth: parseNumber(ruleForm.umaFourth, fallbackRule.uma.fourth),
+    },
+    bankruptcyEnabled: ruleForm.bankruptcyEnabled,
+    tieBreak: fallbackRule.tieBreak,
+    dealerRepeatRule: ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
+    agariYameEnabled: ruleForm.agariYameEnabled,
+    westRoundEnabled: ruleForm.westRoundEnabled,
+    doubleRonEnabled: ruleForm.doubleRonEnabled,
+    tripleRonEnabled: ruleForm.tripleRonEnabled,
+    abortiveDrawEnabled: ruleForm.abortiveDrawEnabled,
+  };
 }
 
 export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
@@ -57,12 +97,28 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [ruleSaving, setRuleSaving] = useState(false);
+  const [ruleFormState, setRuleFormState] = useState<{
+    groupId: string;
+    form: RuleForm;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group.groupId === selectedGroupId) ?? null,
     [groups, selectedGroupId],
   );
+  const ruleForm = useMemo(() => {
+    if (!selectedGroup) {
+      return null;
+    }
+
+    if (ruleFormState?.groupId === selectedGroup.groupId) {
+      return ruleFormState.form;
+    }
+
+    return createRuleForm(selectedGroup.defaultRule);
+  }, [ruleFormState, selectedGroup]);
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
@@ -185,6 +241,68 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
     setActiveView("ranking");
   }
 
+  function setRuleForm(updater: (current: RuleForm | null) => RuleForm | null) {
+    setRuleFormState((current) => {
+      if (!selectedGroup) {
+        return null;
+      }
+
+      const currentForm =
+        current?.groupId === selectedGroup.groupId
+          ? current.form
+          : createRuleForm(selectedGroup.defaultRule);
+      const nextForm = updater(currentForm);
+
+      return nextForm ? { groupId: selectedGroup.groupId, form: nextForm } : null;
+    });
+  }
+
+  function updateAbortiveDrawRule(key: AbortiveDrawType, enabled: boolean) {
+    setRuleForm((current) =>
+      current
+        ? {
+            ...current,
+            abortiveDrawEnabled: {
+              ...current.abortiveDrawEnabled,
+              [key]: enabled,
+            },
+          }
+        : current,
+    );
+  }
+
+  async function handleSaveRule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedGroup || !ruleForm) {
+      return;
+    }
+
+    setRuleSaving(true);
+    setError(null);
+
+    try {
+      await updateGroupDefaultRule({
+        groupId: selectedGroup.groupId,
+        defaultRule: buildRule(ruleForm, selectedGroup.defaultRule),
+      });
+      await loadGroups();
+      setSelectedGroupId(selectedGroup.groupId);
+      setActiveView("rules");
+    } catch (saveError) {
+      const message =
+        saveError instanceof Error ? saveError.message : "ルールの保存に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "ルールを保存できませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setRuleSaving(false);
+    }
+  }
+
   const showGroupSelector = activeView === "groups" || !selectedGroup;
 
   return (
@@ -305,59 +423,225 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
               ) : null}
 
               {activeView === "rules" ? (
-                <>
-                  <div className="metric-grid">
-                    <div className="metric">
-                      <span className="label">開始点</span>
-                      <strong>{selectedGroup.defaultRule.initialScore.toLocaleString()}</strong>
+                ruleForm ? (
+                  <form className="match-form" onSubmit={handleSaveRule}>
+                    <div className="rule-grid">
+                      <label>
+                        <span>開始点</span>
+                        <input
+                          inputMode="numeric"
+                          value={ruleForm.initialScore}
+                          onChange={(event) =>
+                            setRuleForm((current) =>
+                              current ? { ...current, initialScore: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>返し点</span>
+                        <input
+                          inputMode="numeric"
+                          value={ruleForm.returnScore}
+                          onChange={(event) =>
+                            setRuleForm((current) =>
+                              current ? { ...current, returnScore: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>ウマ 1着</span>
+                        <input
+                          inputMode="numeric"
+                          value={ruleForm.umaFirst}
+                          onChange={(event) =>
+                            setRuleForm((current) =>
+                              current ? { ...current, umaFirst: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>ウマ 2着</span>
+                        <input
+                          inputMode="numeric"
+                          value={ruleForm.umaSecond}
+                          onChange={(event) =>
+                            setRuleForm((current) =>
+                              current ? { ...current, umaSecond: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>ウマ 3着</span>
+                        <input
+                          inputMode="numeric"
+                          value={ruleForm.umaThird}
+                          onChange={(event) =>
+                            setRuleForm((current) =>
+                              current ? { ...current, umaThird: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>ウマ 4着</span>
+                        <input
+                          inputMode="numeric"
+                          value={ruleForm.umaFourth}
+                          onChange={(event) =>
+                            setRuleForm((current) =>
+                              current ? { ...current, umaFourth: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
                     </div>
-                    <div className="metric">
-                      <span className="label">返し点</span>
-                      <strong>{selectedGroup.defaultRule.returnScore.toLocaleString()}</strong>
-                    </div>
-                    <div className="metric">
-                      <span className="label">ウマ</span>
-                      <strong>{formatUma(selectedGroup)}</strong>
-                    </div>
-                    <div className="metric">
-                      <span className="label">トビ終了</span>
-                      <strong>
-                        {selectedGroup.defaultRule.bankruptcyEnabled ? "あり" : "なし"}
-                      </strong>
-                    </div>
-                  </div>
 
-                  <div className="metric-grid">
-                    <div className="metric">
-                      <span className="label">西入</span>
-                      <strong>
-                        {selectedGroup.defaultRule.westRoundEnabled ? "あり" : "なし"}
-                      </strong>
-                    </div>
-                    <div className="metric">
-                      <span className="label">上がりやめ</span>
-                      <strong>
-                        {selectedGroup.defaultRule.agariYameEnabled ?? true ? "あり" : "なし"}
-                      </strong>
-                    </div>
-                    <div className="metric">
-                      <span className="label">ダブロン</span>
-                      <strong>
-                        {selectedGroup.defaultRule.doubleRonEnabled ?? true ? "あり" : "なし"}
-                      </strong>
-                    </div>
-                    <div className="metric">
-                      <span className="label">トリロン</span>
-                      <strong>
-                        {selectedGroup.defaultRule.tripleRonEnabled ?? true ? "あり" : "なし"}
-                      </strong>
-                    </div>
-                    <div className="metric">
+                    <label className="select-field">
+                      <span>トビ終了</span>
+                      <select
+                        value={ruleForm.bankruptcyEnabled ? "enabled" : "disabled"}
+                        onChange={(event) =>
+                          setRuleForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  bankruptcyEnabled: event.target.value === "enabled",
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        <option value="enabled">あり: 誰かが飛んだら終了</option>
+                        <option value="disabled">なし: 誰かが飛んでも続行</option>
+                      </select>
+                    </label>
+
+                    <label className="select-field">
+                      <span>連荘ルール</span>
+                      <select
+                        value={ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE}
+                        onChange={(event) =>
+                          setRuleForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  dealerRepeatRule: event.target.value as DealerRepeatRule,
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        <option value="dealer-win-or-tenpai">親和了・親テンパイ流局で連荘</option>
+                        <option value="dealer-win">親和了のみ連荘</option>
+                        <option value="always">流局は親テンパイに関係なく連荘</option>
+                      </select>
+                    </label>
+
+                    <label className="select-field">
+                      <span>西入</span>
+                      <select
+                        value={ruleForm.westRoundEnabled ? "enabled" : "disabled"}
+                        onChange={(event) =>
+                          setRuleForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  westRoundEnabled: event.target.value === "enabled",
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        <option value="enabled">あり: 南4局終了時に誰も返し点未満なら西入</option>
+                        <option value="disabled">なし: 南4局で半荘終了</option>
+                      </select>
+                    </label>
+
+                    <label className="select-field">
+                      <span>上がりやめ</span>
+                      <select
+                        value={ruleForm.agariYameEnabled ? "enabled" : "disabled"}
+                        onChange={(event) =>
+                          setRuleForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  agariYameEnabled: event.target.value === "enabled",
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        <option value="enabled">あり: 最終局の親がトップで和了したら終了</option>
+                        <option value="disabled">なし: 親が和了したら連荘</option>
+                      </select>
+                    </label>
+
+                    <label className="select-field">
+                      <span>ダブロン</span>
+                      <select
+                        value={ruleForm.doubleRonEnabled ? "enabled" : "disabled"}
+                        onChange={(event) =>
+                          setRuleForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  doubleRonEnabled: event.target.value === "enabled",
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        <option value="enabled">あり</option>
+                        <option value="disabled">なし</option>
+                      </select>
+                    </label>
+
+                    <label className="select-field">
+                      <span>トリロン</span>
+                      <select
+                        value={ruleForm.tripleRonEnabled ? "enabled" : "disabled"}
+                        onChange={(event) =>
+                          setRuleForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  tripleRonEnabled: event.target.value === "enabled",
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        <option value="enabled">あり</option>
+                        <option value="disabled">なし</option>
+                      </select>
+                    </label>
+
+                    <div className="check-list">
                       <span className="label">途中流局</span>
-                      <strong>{formatAbortiveDrawRules(selectedGroup)}</strong>
+                      {ABORTIVE_DRAW_LABELS.map((option) => (
+                        <label key={option.key} className="check-row">
+                          <input
+                            type="checkbox"
+                            checked={ruleForm.abortiveDrawEnabled[option.key]}
+                            onChange={(event) =>
+                              updateAbortiveDrawRule(option.key, event.target.checked)
+                            }
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
                     </div>
-                  </div>
-                </>
+
+                    <button type="submit" className="primary-button" disabled={ruleSaving}>
+                      {ruleSaving ? "保存中..." : "ルールを保存"}
+                    </button>
+                  </form>
+                ) : null
               ) : null}
               </>
             ) : (
