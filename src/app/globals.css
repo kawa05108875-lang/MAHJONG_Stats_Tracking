@@ -307,13 +307,20 @@ select:focus {
 }
 
 .group-item {
-  display: grid;
-  justify-items: start;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   width: 100%;
-  min-height: 58px;
-  padding: 10px 12px;
+  min-height: 52px;
+  padding: 0 14px;
   text-align: left;
+}
+
+.group-item span {
+  overflow: hidden;
+  font-size: 1.05rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .group-item small {
