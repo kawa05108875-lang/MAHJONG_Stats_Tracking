@@ -275,7 +275,6 @@ function MatchResultPanel({
   const nextMatchButton = (
     <button
       type="button"
-      className="primary-inline-button"
       disabled={startingNextMatch !== null}
       onClick={onStartNextMatch}
     >
@@ -317,8 +316,8 @@ function MatchResultPanel({
       </div>
       {rotateNotice ? <p className="notice-text">{rotateNotice}</p> : null}
       <div className="row-actions result-actions">
-        {shouldPrioritizeShuffle ? shuffleButton : nextMatchButton}
-        {shouldPrioritizeShuffle ? nextMatchButton : shuffleButton}
+        {nextMatchButton}
+        {shuffleButton}
       </div>
     </section>
   );
