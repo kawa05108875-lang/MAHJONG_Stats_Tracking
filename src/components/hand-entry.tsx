@@ -374,8 +374,6 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     handType === "draw" || scoreDeltaTotal === expectedScoreDeltaTotal;
   const nextRiichiSticks =
     handType === "draw" ? match.currentRiichiSticks + riichiPlayerIds.length : 0;
-  const ronHonbaBonus = match.currentHonba * RON_HONBA_BONUS;
-  const tsumoHonbaBonus = match.currentHonba * TSUMO_HONBA_BONUS;
   const currentDealerPlayerId = getCurrentDealerPlayerId(match);
   const currentSeatPlayers = useMemo(() => getCurrentSeatPlayers(match), [match]);
   const winnerIsDealer = winnerPlayerId === currentDealerPlayerId;
@@ -782,22 +780,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               )
             ) : null}
 
-            <div className="notice">
-              <strong>本場は自動加算</strong>
-              <span>
-                入力するのは素点の支払い点だけです。{match.currentHonba}本場なので、
-                ロンは放銃者の支払いに+{ronHonbaBonus.toLocaleString()}点、ツモは各家の支払いに+
-                {tsumoHonbaBonus.toLocaleString()}点を自動で足します。
-              </span>
-            </div>
-
-            <div className="notice">
-              <strong>供託回収</strong>
-              <span>
-                現在供託 {match.currentRiichiSticks}本 + 今回リーチ{" "}
-                {riichiPlayerIds.length}本を和了者が回収します。
-              </span>
-            </div>
+            <p className="notice-text">素点だけ入力してください。本場と供託は自動反映されます。</p>
           </>
         ) : null}
 
