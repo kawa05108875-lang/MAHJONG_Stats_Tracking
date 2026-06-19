@@ -308,15 +308,6 @@ export function PlayerManager({ groupId, user, onOpenPlayerStats }: PlayerManage
                 <button type="submit" disabled={saving}>
                   保存
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingPlayerId(null);
-                    setEditingName("");
-                  }}
-                >
-                  取消
-                </button>
               </form>
             ) : (
               <>
@@ -356,7 +347,7 @@ export function PlayerManager({ groupId, user, onOpenPlayerStats }: PlayerManage
                     </button>
                   ) : null}
                   <button type="button" onClick={() => startEditing(player)}>
-                    編集
+                    名前変更
                   </button>
                   <button
                     type="button"
