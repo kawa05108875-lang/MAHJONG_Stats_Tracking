@@ -475,8 +475,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         currentScores,
         match.dealerPlayerId,
         match.rule,
+        match.currentRiichiSticks,
       ),
-    [currentScores, match.dealerPlayerId, match.players, match.rule],
+    [currentScores, match.currentRiichiSticks, match.dealerPlayerId, match.players, match.rule],
   );
 
   const loadHands = useCallback(async () => {
@@ -637,11 +638,14 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         abortiveDrawProgression,
       });
       const nextScores = applyScoreDeltas(currentScores, scoreDeltas);
+      const nextRiichiSticksForFinalResults =
+        handType === "draw" || handType === "abortive-draw" ? nextRiichiSticks : 0;
       const calculatedFinalResults = calculateMatchFinalResults(
         match.players,
         nextScores,
         match.dealerPlayerId,
         match.rule,
+        nextRiichiSticksForFinalResults,
       );
       const finalResultsByBankruptcy =
         match.rule.bankruptcyEnabled && hasBankruptPlayer(nextScores)
@@ -707,11 +711,6 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   async function handleFinishMatch() {
     if (hands.length === 0) {
       setError("少なくとも1局は入力してから半荘を終了してください。");
-      return;
-    }
-
-    if (match.currentRiichiSticks > 0) {
-      setError("供託が残っています。最後の局結果を確認してから半荘を終了してください。");
       return;
     }
 
@@ -1099,7 +1098,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       </div>
 
       {match.currentRiichiSticks > 0 ? (
-        <p className="error">供託が{match.currentRiichiSticks}本残っています。</p>
+        <p className="notice-text">
+          供託が{match.currentRiichiSticks}本残っています。半荘終了時はトップに加算されます。
+        </p>
       ) : null}
 
       {error ? <p className="error">{error}</p> : null}

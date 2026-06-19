@@ -108,11 +108,14 @@ export function calculateMatchFinalResults(
   scores: PlayerScoreMap,
   dealerPlayerId: string,
   rule: MatchRule,
+  remainingRiichiSticks = 0,
 ): MatchFinalResult[] {
   const rankedPlayers = rankPlayersByScore(players, scores, dealerPlayerId);
+  const riichiStickPoint = remainingRiichiSticks * 1000;
 
   return rankedPlayers.map((player) => {
-    const rawPoint = calculateRawPoint(player.score, rule.returnScore);
+    const finalScore = player.score + (player.rank === 1 ? riichiStickPoint : 0);
+    const rawPoint = calculateRawPoint(finalScore, rule.returnScore);
     const uma = rule.uma[RANK_UMA_KEY[player.rank]];
     const oka = calculateOka(player.rank, rule);
 
@@ -120,7 +123,7 @@ export function calculateMatchFinalResults(
       playerId: player.playerId,
       name: player.name,
       seatIndex: player.seatIndex,
-      finalScore: player.score,
+      finalScore,
       rank: player.rank,
       rawPoint,
       uma,
@@ -135,8 +138,15 @@ export function calculateMatchFinalResultsFromHands(
   hands: Pick<Hand, "scoreDeltas">[],
   dealerPlayerId: string,
   rule: MatchRule,
+  remainingRiichiSticks = 0,
 ) {
   const scores = calculateCurrentScores(players, hands, rule.initialScore);
 
-  return calculateMatchFinalResults(players, scores, dealerPlayerId, rule);
+  return calculateMatchFinalResults(
+    players,
+    scores,
+    dealerPlayerId,
+    rule,
+    remainingRiichiSticks,
+  );
 }

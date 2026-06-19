@@ -165,7 +165,7 @@ export async function createHandAndAdvanceMatch(input: CreateHandInput) {
   batch.update(matchRef, {
     currentRound: input.nextRound,
     currentHonba: input.nextHonba,
-    currentRiichiSticks: input.nextRiichiSticks,
+    currentRiichiSticks: input.finalResults ? 0 : input.nextRiichiSticks,
     ...(input.finalResults
       ? {
           status: "finished",

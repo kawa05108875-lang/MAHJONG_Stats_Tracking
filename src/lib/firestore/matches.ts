@@ -104,6 +104,7 @@ export async function finishMatch(params: {
 
   await updateDoc(matchRef, {
     status: "finished",
+    currentRiichiSticks: 0,
     finalResults: params.finalResults,
     updatedBy: params.uid,
     updatedAt: serverTimestamp(),
