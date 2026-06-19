@@ -88,6 +88,10 @@ function buildRule(ruleForm: RuleForm, fallbackRule: MatchRule): MatchRule {
   };
 }
 
+function ruleFormKey(ruleForm: RuleForm) {
+  return JSON.stringify(ruleForm);
+}
+
 export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -122,6 +126,14 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
 
     return createRuleForm(selectedGroup.defaultRule);
   }, [ruleFormState, selectedGroup]);
+  const savedRuleForm = useMemo(
+    () => (selectedGroup ? createRuleForm(selectedGroup.defaultRule) : null),
+    [selectedGroup],
+  );
+  const ruleHasChanges =
+    ruleForm && savedRuleForm
+      ? ruleFormKey(ruleForm) !== ruleFormKey(savedRuleForm)
+      : false;
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
@@ -286,6 +298,19 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
     event.preventDefault();
 
     if (!selectedGroup || !ruleForm) {
+      return;
+    }
+
+    if (!ruleHasChanges) {
+      setError("ルールは変更されていません。");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "ルールを保存します。今後作成する半荘に反映されます。保存しますか？",
+    );
+
+    if (!confirmed) {
       return;
     }
 
@@ -667,8 +692,16 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                       ))}
                     </div>
 
-                    <button type="submit" className="primary-button" disabled={ruleSaving}>
-                      {ruleSaving ? "保存中..." : "ルールを保存"}
+                    <p className="notice-text">
+                      変更がある時だけ保存できます。保存前に確認が表示されます。
+                    </p>
+
+                    <button
+                      type="submit"
+                      className="primary-button"
+                      disabled={ruleSaving || !ruleHasChanges}
+                    >
+                      {ruleSaving ? "保存中..." : ruleHasChanges ? "ルールを保存" : "変更なし"}
                     </button>
                   </form>
                 ) : null
