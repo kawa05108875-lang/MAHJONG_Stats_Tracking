@@ -773,7 +773,15 @@ select:focus {
 }
 
 .minor-action-row .compact-action-button {
-  color: var(--muted);
+  border-color: rgba(15, 118, 110, 0.26);
+  background: #f8fbfa;
+  color: var(--primary-strong);
+  font-weight: 800;
+}
+
+.minor-action-row .compact-action-button:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: #eef9f6;
 }
 
 .sticky-action {
