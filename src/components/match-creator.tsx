@@ -410,12 +410,16 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             <span className="status-pill linked">
               {statusLabel(match.status)}
             </span>
-            <button type="button" onClick={() => openMatch(match.matchId)}>
+            <button
+              type="button"
+              className="compact-action-button"
+              onClick={() => openMatch(match.matchId)}
+            >
               {match.status === "finished" ? "結果" : "局入力"}
             </button>
             <button
               type="button"
-              className="danger-button"
+              className="compact-action-button danger-button"
               onClick={() => void handleDeleteMatch(match)}
               disabled={deletingMatchId === match.matchId}
             >
