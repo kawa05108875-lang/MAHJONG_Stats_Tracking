@@ -467,6 +467,13 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           : {},
     [ronPoint, ronPointInputs, ronWinnerCount, winnerPlayerId, winnerPlayerIds],
   );
+  const drawTenpaiPlayerIds = useMemo(
+    () =>
+      handType === "draw"
+        ? Array.from(new Set([...tenpaiPlayerIds, ...riichiPlayerIds]))
+        : tenpaiPlayerIds,
+    [handType, riichiPlayerIds, tenpaiPlayerIds],
+  );
 
   const scoreDeltas = useMemo<ScoreDelta[]>(
     () => {
@@ -484,7 +491,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       }
 
       if (handType === "draw") {
-        return calculateDrawScoreDeltas(match, tenpaiPlayerIds, riichiPlayerIds);
+        return calculateDrawScoreDeltas(match, drawTenpaiPlayerIds, riichiPlayerIds);
       }
 
       if (handType === "abortive-draw") {
@@ -506,7 +513,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       riichiPlayerIds,
       ronPointsByWinner,
       scoreInputs,
-      tenpaiPlayerIds,
+      drawTenpaiPlayerIds,
       winType,
     ],
   );
@@ -588,6 +595,18 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         ? values.filter((value) => value !== playerId)
         : [...values, playerId],
     );
+  }
+
+  function toggleRiichiPlayerId(playerId: string) {
+    const willAddRiichi = !riichiPlayerIds.includes(playerId);
+
+    togglePlayerId(playerId, riichiPlayerIds, setRiichiPlayerIds);
+
+    if (handType === "draw" && willAddRiichi && !tenpaiPlayerIds.includes(playerId)) {
+      setTenpaiPlayerIds([...tenpaiPlayerIds, playerId]);
+    }
+
+    setDrawRiichiSticksConfirmed(false);
   }
 
   function resetForm() {
@@ -765,7 +784,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         match,
         handType,
         winnerPlayerIds: effectiveWinnerPlayerIds,
-        tenpaiPlayerIds,
+        tenpaiPlayerIds: drawTenpaiPlayerIds,
         abortiveDrawProgression,
       });
       const nextScores = applyScoreDeltas(currentScores, scoreDeltas);
@@ -810,7 +829,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         winnerPlayerId: handType === "win" ? effectiveWinnerPlayerIds[0] : undefined,
         winnerPlayerIds: handType === "win" ? effectiveWinnerPlayerIds : undefined,
         loserPlayerId: handType === "win" && winType === "ron" ? loserPlayerId : undefined,
-        tenpaiPlayerIds: handType === "draw" ? tenpaiPlayerIds : undefined,
+        tenpaiPlayerIds: handType === "draw" ? drawTenpaiPlayerIds : undefined,
         scoreDeltas,
         memo: null,
         nextRound: nextProgression.nextRound,
@@ -1119,21 +1138,32 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             {handType === "draw" ? (
               <div className="check-list">
                 <span className="label">聴牌者</span>
-                {currentSeatPlayers.map((player) => (
-                  <label key={player.playerId} className="check-row">
-                    <input
-                      type="checkbox"
-                      checked={tenpaiPlayerIds.includes(player.playerId)}
-                      onChange={() => {
-                        togglePlayerId(player.playerId, tenpaiPlayerIds, setTenpaiPlayerIds);
-                        setDrawRiichiSticksConfirmed(false);
-                      }}
-                    />
-                    <span>
-                      {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
-                    </span>
-                  </label>
-                ))}
+                {currentSeatPlayers.map((player) => {
+                  const isRiichiPlayer = riichiPlayerIds.includes(player.playerId);
+
+                  return (
+                    <label key={player.playerId} className="check-row">
+                      <input
+                        type="checkbox"
+                        checked={drawTenpaiPlayerIds.includes(player.playerId)}
+                        disabled={isRiichiPlayer}
+                        onChange={() => {
+                          if (isRiichiPlayer) {
+                            return;
+                          }
+
+                          togglePlayerId(player.playerId, tenpaiPlayerIds, setTenpaiPlayerIds);
+                          setDrawRiichiSticksConfirmed(false);
+                        }}
+                      />
+                      <span>
+                        {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                        {isRiichiPlayer ? "（リーチ）" : ""}
+                      </span>
+                    </label>
+                  );
+                })}
+                <p className="notice-text">リーチ者は自動で聴牌扱いになります。</p>
               </div>
             ) : null}
 
@@ -1184,10 +1214,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                   <input
                     type="checkbox"
                     checked={riichiPlayerIds.includes(player.playerId)}
-                    onChange={() => {
-                      togglePlayerId(player.playerId, riichiPlayerIds, setRiichiPlayerIds);
-                      setDrawRiichiSticksConfirmed(false);
-                    }}
+                    onChange={() => toggleRiichiPlayerId(player.playerId)}
                   />
                   <span>
                     {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
@@ -1200,8 +1227,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               <div className="notice">
                 <strong>流局精算確認</strong>
                 <span>
-                  聴牌者 {tenpaiPlayerIds.length}人 / ノーテン{" "}
-                  {match.players.length - tenpaiPlayerIds.length}人
+                  聴牌者 {drawTenpaiPlayerIds.length}人 / ノーテン{" "}
+                  {match.players.length - drawTenpaiPlayerIds.length}人
                 </span>
                 <span>
                   現在供託 {match.currentRiichiSticks}本 + 今回リーチ{" "}

@@ -704,6 +704,13 @@ select:focus {
   overflow-wrap: anywhere;
 }
 
+.match-block-total-ranking span {
+  border-color: #b9d9c6;
+  background: #edf8f1;
+  color: #1f5c38;
+  font-weight: 700;
+}
+
 .hand-entry-panel {
   display: grid;
   gap: 12px;

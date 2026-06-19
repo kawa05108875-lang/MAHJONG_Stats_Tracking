@@ -801,10 +801,10 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
                 </span>
               </div>
               {block.playerTotals.length > 0 ? (
-                <div className="match-result-summary">
-                  {block.playerTotals.map((playerTotal) => (
+                <div className="match-result-summary match-block-total-ranking">
+                  {block.playerTotals.map((playerTotal, index) => (
                     <span key={playerTotal.playerId}>
-                      {playerTotal.name} {playerTotal.totalPoint.toFixed(1)}pt
+                      {index + 1}位 {playerTotal.name} {playerTotal.totalPoint.toFixed(1)}pt
                     </span>
                   ))}
                 </div>
@@ -818,9 +818,6 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
                   <div key={match.matchId} className="match-row">
                     <div>
                       <strong>{matchNumberLabel(match, index)}</strong>
-                      <span className="muted">
-                        {match.players.map((player) => player.name).join(" / ")}
-                      </span>
                       {recentResults.length > 0 ? (
                         <div className="match-result-summary">
                           {recentResults.map((result) => (
