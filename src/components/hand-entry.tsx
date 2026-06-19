@@ -308,6 +308,7 @@ function handTypeLabel(handType: HandType, winType?: WinType) {
 
 export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const [hands, setHands] = useState<HandSummary[]>([]);
+  const [handTypeSelected, setHandTypeSelected] = useState(false);
   const [handType, setHandType] = useState<HandType>("win");
   const [winType, setWinType] = useState<WinType>("ron");
   const [winnerPlayerId, setWinnerPlayerId] = useState("");
@@ -433,6 +434,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   }
 
   function resetForm() {
+    setHandTypeSelected(false);
+    setHandType("win");
+    setWinType("ron");
     setScoreInputs(createEmptyScoreInputs(match));
     setWinnerPlayerId("");
     setLoserPlayerId("");
@@ -444,8 +448,32 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setDrawRiichiSticksConfirmed(false);
   }
 
+  function selectHandType(type: HandType) {
+    setHandType(type);
+    setHandTypeSelected(true);
+    setError(null);
+    setDrawRiichiSticksConfirmed(false);
+  }
+
+  function changeHandType() {
+    setHandTypeSelected(false);
+    setError(null);
+    setWinnerPlayerId("");
+    setLoserPlayerId("");
+    setRonPoint("");
+    setDealerTsumoPoint("");
+    setChildTsumoPoint("");
+    setTenpaiPlayerIds([]);
+    setDrawRiichiSticksConfirmed(false);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!handTypeSelected) {
+      setError("局結果の種類を選択してください。");
+      return;
+    }
 
     if (!scoreDeltaTotalIsValid) {
       setError(
@@ -613,238 +641,251 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       </div>
 
       <form className="match-form" onSubmit={handleSubmit}>
-        <div className="segmented-control">
-          {(["win", "draw", "penalty"] as const).map((type) => (
-            <button
-              key={type}
-              type="button"
-              className={handType === type ? "is-active" : ""}
-              onClick={() => {
-                setHandType(type);
-                setDrawRiichiSticksConfirmed(false);
-              }}
-            >
-              {type === "win" ? "和了" : type === "draw" ? "流局" : "罰符"}
-            </button>
-          ))}
-        </div>
-
-        {handType === "win" ? (
+        {!handTypeSelected ? (
+          <div className="segmented-control">
+            {(["win", "draw", "penalty"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => selectHandType(type)}
+              >
+                {type === "win" ? "和了" : type === "draw" ? "流局" : "罰符"}
+              </button>
+            ))}
+          </div>
+        ) : (
           <>
-            <div className="segmented-control compact">
-              {(["ron", "tsumo"] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={winType === type ? "is-active" : ""}
-                  onClick={() => {
-                    setWinType(type);
-                    setRonPoint("");
-                    setDealerTsumoPoint("");
-                    setChildTsumoPoint("");
-                  }}
-                >
-                  {type === "ron" ? "ロン" : "ツモ"}
-                </button>
+            <div className="section-header">
+              <div>
+                <p className="eyebrow">Hand Type</p>
+                <h4>{handType === "win" ? "和了" : handType === "draw" ? "流局" : "罰符"}</h4>
+              </div>
+              <button type="button" onClick={changeHandType}>
+                局種変更
+              </button>
+            </div>
+
+            {handType === "win" ? (
+              <>
+                <div>
+                  <p className="label">和了形式</p>
+                  <div className="segmented-control compact">
+                    {(["ron", "tsumo"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        className={winType === type ? "is-active" : ""}
+                        onClick={() => {
+                          setWinType(type);
+                          setRonPoint("");
+                          setDealerTsumoPoint("");
+                          setChildTsumoPoint("");
+                        }}
+                      >
+                        {type === "ron" ? "ロン" : "ツモ"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="select-field">
+                  <span>和了者</span>
+                  <select
+                    value={winnerPlayerId}
+                    onChange={(event) => {
+                      setWinnerPlayerId(event.target.value);
+                      setRonPoint("");
+                      setDealerTsumoPoint("");
+                      setChildTsumoPoint("");
+                    }}
+                  >
+                    <option value="">選択</option>
+                    {currentSeatPlayers.map((player) => (
+                      <option key={player.playerId} value={player.playerId}>
+                        {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {winType === "ron" ? (
+                  <>
+                    <label className="select-field">
+                      <span>放銃者</span>
+                      <select
+                        value={loserPlayerId}
+                        onChange={(event) => setLoserPlayerId(event.target.value)}
+                      >
+                        <option value="">選択</option>
+                        {currentSeatPlayers
+                          .filter((player) => player.playerId !== winnerPlayerId)
+                          .map((player) => (
+                            <option key={player.playerId} value={player.playerId}>
+                              {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="label">ロン支払い点（素点・本場なし）</span>
+                      <input
+                        inputMode="numeric"
+                        value={ronPoint}
+                        onChange={(event) => setRonPoint(event.target.value)}
+                        placeholder="例: 8000"
+                      />
+                    </label>
+                  </>
+                ) : winnerPlayerId ? (
+                  winnerIsDealer ? (
+                    <label>
+                      <span className="label">親ツモ 各自支払い点（素点・本場なし）</span>
+                      <input
+                        inputMode="numeric"
+                        value={dealerTsumoPoint}
+                        onChange={(event) => setDealerTsumoPoint(event.target.value)}
+                        placeholder="例: 4000"
+                      />
+                    </label>
+                  ) : (
+                    <div className="score-input-grid">
+                      <label>
+                        <span>子ツモ 親支払い点（素点・本場なし）</span>
+                        <input
+                          inputMode="numeric"
+                          value={dealerTsumoPoint}
+                          onChange={(event) => setDealerTsumoPoint(event.target.value)}
+                          placeholder="例: 3900"
+                        />
+                      </label>
+                      <label>
+                        <span>子ツモ 子支払い点（素点・本場なし）</span>
+                        <input
+                          inputMode="numeric"
+                          value={childTsumoPoint}
+                          onChange={(event) => setChildTsumoPoint(event.target.value)}
+                          placeholder="例: 2000"
+                        />
+                      </label>
+                    </div>
+                  )
+                ) : null}
+
+                <p className="notice-text">素点だけ入力してください。本場と供託は自動反映されます。</p>
+              </>
+            ) : null}
+
+            {handType === "draw" ? (
+              <div className="check-list">
+                <span className="label">聴牌者</span>
+                {currentSeatPlayers.map((player) => (
+                  <label key={player.playerId} className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={tenpaiPlayerIds.includes(player.playerId)}
+                      onChange={() => {
+                        togglePlayerId(player.playerId, tenpaiPlayerIds, setTenpaiPlayerIds);
+                        setDrawRiichiSticksConfirmed(false);
+                      }}
+                    />
+                    <span>
+                      {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="check-list">
+              <span className="label">リーチ者</span>
+              {currentSeatPlayers.map((player) => (
+                <label key={player.playerId} className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={riichiPlayerIds.includes(player.playerId)}
+                    onChange={() => {
+                      togglePlayerId(player.playerId, riichiPlayerIds, setRiichiPlayerIds);
+                      setDrawRiichiSticksConfirmed(false);
+                    }}
+                  />
+                  <span>
+                    {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                  </span>
+                </label>
               ))}
             </div>
 
-            <label className="select-field">
-              <span>和了者</span>
-              <select
-                value={winnerPlayerId}
-                onChange={(event) => {
-                  setWinnerPlayerId(event.target.value);
-                  setRonPoint("");
-                  setDealerTsumoPoint("");
-                  setChildTsumoPoint("");
-                }}
-              >
-                <option value="">選択</option>
-                {currentSeatPlayers.map((player) => (
-                  <option key={player.playerId} value={player.playerId}>
-                    {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {winType === "ron" ? (
-              <>
-                <label className="select-field">
-                  <span>放銃者</span>
-                  <select
-                    value={loserPlayerId}
-                    onChange={(event) => setLoserPlayerId(event.target.value)}
-                  >
-                    <option value="">選択</option>
-                    {currentSeatPlayers
-                      .filter((player) => player.playerId !== winnerPlayerId)
-                      .map((player) => (
-                        <option key={player.playerId} value={player.playerId}>
-                          {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label>
-                  <span className="label">ロン支払い点（素点・本場なし）</span>
+            {handType === "draw" ? (
+              <div className="notice">
+                <strong>流局精算確認</strong>
+                <span>
+                  聴牌者 {tenpaiPlayerIds.length}人 / ノーテン{" "}
+                  {match.players.length - tenpaiPlayerIds.length}人
+                </span>
+                <span>
+                  現在供託 {match.currentRiichiSticks}本 + 今回リーチ{" "}
+                  {riichiPlayerIds.length}本 = 次局供託 {nextRiichiSticks}本
+                </span>
+                <label className="check-row">
                   <input
-                    inputMode="numeric"
-                    value={ronPoint}
-                    onChange={(event) => setRonPoint(event.target.value)}
-                    placeholder="例: 8000"
+                    type="checkbox"
+                    checked={drawRiichiSticksConfirmed}
+                    onChange={(event) =>
+                      setDrawRiichiSticksConfirmed(event.target.checked)
+                    }
                   />
+                  <span>この供託本数で保存する</span>
                 </label>
-              </>
-            ) : winnerPlayerId ? (
-              winnerIsDealer ? (
-                <label>
-                  <span className="label">親ツモ 各自支払い点（素点・本場なし）</span>
-                  <input
-                    inputMode="numeric"
-                    value={dealerTsumoPoint}
-                    onChange={(event) => setDealerTsumoPoint(event.target.value)}
-                    placeholder="例: 4000"
-                  />
-                </label>
-              ) : (
-                <div className="score-input-grid">
-                  <label>
-                    <span>子ツモ 親支払い点（素点・本場なし）</span>
-                    <input
-                      inputMode="numeric"
-                      value={dealerTsumoPoint}
-                      onChange={(event) => setDealerTsumoPoint(event.target.value)}
-                      placeholder="例: 3900"
-                    />
-                  </label>
-                  <label>
-                    <span>子ツモ 子支払い点（素点・本場なし）</span>
-                    <input
-                      inputMode="numeric"
-                      value={childTsumoPoint}
-                      onChange={(event) => setChildTsumoPoint(event.target.value)}
-                      placeholder="例: 2000"
-                    />
-                  </label>
-                </div>
-              )
+              </div>
             ) : null}
 
-            <p className="notice-text">素点だけ入力してください。本場と供託は自動反映されます。</p>
+            <div className="score-input-grid">
+              {currentSeatPlayers.map((player) => (
+                <label key={player.playerId}>
+                  <span>
+                    {getCurrentHouseLabel(match, player.seatIndex)} {player.name} 増減
+                  </span>
+                  <input
+                    inputMode="numeric"
+                    value={
+                      handType === "win" || handType === "draw"
+                        ? String(
+                            scoreDeltas.find(
+                              (scoreDelta) => scoreDelta.playerId === player.playerId,
+                            )?.delta ?? 0,
+                          )
+                        : scoreInputs[player.playerId] ?? "0"
+                    }
+                    readOnly={handType === "win" || handType === "draw"}
+                    onChange={(event) =>
+                      setScoreInputs((current) => ({
+                        ...current,
+                        [player.playerId]: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <p
+              className={
+                scoreDeltaTotalIsValid ? "success-text" : "error"
+              }
+            >
+              点数増減合計: {scoreDeltaTotal.toLocaleString()}
+              {handType === "win"
+                ? ` / 供託回収分 ${expectedScoreDeltaTotal.toLocaleString()} と一致すれば保存できます`
+                : ""}
+              {handType === "draw"
+                ? " / ノーテン罰符とリーチ棒を自動計算しています"
+                : ""}
+            </p>
+
+            <button type="submit" className="primary-button sticky-action" disabled={saving}>
+              局結果を保存
+            </button>
           </>
-        ) : null}
-
-        {handType === "draw" ? (
-          <div className="check-list">
-            <span className="label">聴牌者</span>
-            {currentSeatPlayers.map((player) => (
-              <label key={player.playerId} className="check-row">
-                <input
-                  type="checkbox"
-                  checked={tenpaiPlayerIds.includes(player.playerId)}
-                  onChange={() => {
-                    togglePlayerId(player.playerId, tenpaiPlayerIds, setTenpaiPlayerIds);
-                    setDrawRiichiSticksConfirmed(false);
-                  }}
-                />
-                <span>
-                  {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
-                </span>
-              </label>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="check-list">
-          <span className="label">リーチ者</span>
-          {currentSeatPlayers.map((player) => (
-            <label key={player.playerId} className="check-row">
-              <input
-                type="checkbox"
-                checked={riichiPlayerIds.includes(player.playerId)}
-                onChange={() => {
-                  togglePlayerId(player.playerId, riichiPlayerIds, setRiichiPlayerIds);
-                  setDrawRiichiSticksConfirmed(false);
-                }}
-              />
-              <span>
-                {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
-              </span>
-            </label>
-          ))}
-        </div>
-
-        {handType === "draw" ? (
-          <div className="notice">
-            <strong>流局精算確認</strong>
-            <span>
-              聴牌者 {tenpaiPlayerIds.length}人 / ノーテン{" "}
-              {match.players.length - tenpaiPlayerIds.length}人
-            </span>
-            <span>
-              現在供託 {match.currentRiichiSticks}本 + 今回リーチ{" "}
-              {riichiPlayerIds.length}本 = 次局供託 {nextRiichiSticks}本
-            </span>
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={drawRiichiSticksConfirmed}
-                onChange={(event) =>
-                  setDrawRiichiSticksConfirmed(event.target.checked)
-                }
-              />
-              <span>この供託本数で保存する</span>
-            </label>
-          </div>
-        ) : null}
-
-        <div className="score-input-grid">
-          {currentSeatPlayers.map((player) => (
-            <label key={player.playerId}>
-              <span>
-                {getCurrentHouseLabel(match, player.seatIndex)} {player.name} 増減
-              </span>
-              <input
-                inputMode="numeric"
-                value={
-                  handType === "win" || handType === "draw"
-                    ? String(
-                        scoreDeltas.find(
-                          (scoreDelta) => scoreDelta.playerId === player.playerId,
-                        )?.delta ?? 0,
-                      )
-                    : scoreInputs[player.playerId] ?? "0"
-                }
-                readOnly={handType === "win" || handType === "draw"}
-                onChange={(event) =>
-                  setScoreInputs((current) => ({
-                    ...current,
-                    [player.playerId]: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          ))}
-        </div>
-        <p
-          className={
-            scoreDeltaTotalIsValid ? "success-text" : "error"
-          }
-        >
-          点数増減合計: {scoreDeltaTotal.toLocaleString()}
-          {handType === "win"
-            ? ` / 供託回収分 ${expectedScoreDeltaTotal.toLocaleString()} と一致すれば保存できます`
-            : ""}
-          {handType === "draw"
-            ? " / ノーテン罰符とリーチ棒を自動計算しています"
-            : ""}
-        </p>
-
-        <button type="submit" className="primary-button sticky-action" disabled={saving}>
-          局結果を保存
-        </button>
+        )}
       </form>
 
       <div className="section-header">
