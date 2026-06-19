@@ -24,6 +24,7 @@ type SortKey =
   | "winRate"
   | "dealInRate"
   | "firstPlaceRate"
+  | "secondOrBetterRate"
   | "fourthPlaceRate";
 
 const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
@@ -33,6 +34,7 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: "winRate", label: "和了率" },
   { key: "dealInRate", label: "放銃率" },
   { key: "firstPlaceRate", label: "トップ率" },
+  { key: "secondOrBetterRate", label: "連対率" },
   { key: "fourthPlaceRate", label: "ラス率" },
 ];
 
@@ -59,6 +61,7 @@ function formatSortValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
     sortKey === "winRate" ||
     sortKey === "dealInRate" ||
     sortKey === "firstPlaceRate" ||
+    sortKey === "secondOrBetterRate" ||
     sortKey === "fourthPlaceRate"
   ) {
     return formatRate(value);
@@ -222,7 +225,10 @@ export function StatsDashboard({ groupId, onOpenPlayerStats }: StatsDashboardPro
   }, [groupId, loadStats]);
 
   const rankedStats = useMemo(
-    () => [...stats].sort((left, right) => compareStats(left, right, sortKey)),
+    () =>
+      stats
+        .filter((playerStats) => playerStats.matchCount > 0)
+        .sort((left, right) => compareStats(left, right, sortKey)),
     [sortKey, stats],
   );
 
