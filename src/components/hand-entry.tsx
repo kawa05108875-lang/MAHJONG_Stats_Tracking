@@ -661,7 +661,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 <h4>{handType === "win" ? "和了" : handType === "draw" ? "流局" : "罰符"}</h4>
               </div>
               <button type="button" onClick={changeHandType}>
-                局種変更
+                戻る
               </button>
             </div>
 
