@@ -29,6 +29,8 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: "fourthPlaceRate", label: "ラス率" },
 ];
 
+const SORT_LABELS = new Map(SORT_OPTIONS.map((option) => [option.key, option.label]));
+
 function formatPoint(value: number) {
   return `${value.toFixed(1)}pt`;
 }
@@ -37,12 +39,65 @@ function formatRate(value: number) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function compareStats(left: PlayerStatsSummary, right: PlayerStatsSummary, sortKey: SortKey) {
-  if (sortKey === "averageRank" || sortKey === "dealInRate" || sortKey === "fourthPlaceRate") {
-    return left[sortKey] - right[sortKey];
+function statValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
+  const value = playerStats[sortKey];
+
+  return Number.isFinite(value) ? value : 0;
+}
+
+function formatSortValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
+  const value = statValue(playerStats, sortKey);
+
+  if (
+    sortKey === "winRate" ||
+    sortKey === "dealInRate" ||
+    sortKey === "firstPlaceRate" ||
+    sortKey === "fourthPlaceRate"
+  ) {
+    return formatRate(value);
   }
 
-  return right[sortKey] - left[sortKey];
+  if (sortKey === "averageRank") {
+    return value.toFixed(2);
+  }
+
+  return formatPoint(value);
+}
+
+function compareStats(left: PlayerStatsSummary, right: PlayerStatsSummary, sortKey: SortKey) {
+  const leftValue = statValue(left, sortKey);
+  const rightValue = statValue(right, sortKey);
+  const primaryDiff =
+    sortKey === "averageRank" || sortKey === "dealInRate" || sortKey === "fourthPlaceRate"
+      ? leftValue - rightValue
+      : rightValue - leftValue;
+
+  if (primaryDiff !== 0) {
+    return primaryDiff;
+  }
+
+  const pointDiff = statValue(right, "totalPoint") - statValue(left, "totalPoint");
+
+  if (pointDiff !== 0) {
+    return pointDiff;
+  }
+
+  return left.name.localeCompare(right.name, "ja");
+}
+
+function selectedStatsById(
+  stats: PlayerStatsSummary[],
+  selectedPlayerId: string | null,
+) {
+  return stats.find((playerStats) => playerStats.playerId === selectedPlayerId) ?? null;
+}
+
+function sortDirectionLabel(sortKey: SortKey) {
+  if (sortKey === "averageRank" || sortKey === "dealInRate" || sortKey === "fourthPlaceRate") {
+    return "低い順";
+  }
+
+  return "高い順";
 }
 
 export function StatsDashboard({ groupId }: StatsDashboardProps) {
@@ -108,8 +163,7 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
     () => [...stats].sort((left, right) => compareStats(left, right, sortKey)),
     [sortKey, stats],
   );
-  const selectedStats =
-    stats.find((playerStats) => playerStats.playerId === selectedPlayerId) ?? null;
+  const selectedStats = selectedStatsById(stats, selectedPlayerId);
 
   return (
     <section className="manager-panel">
@@ -155,8 +209,10 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
               >
                 <strong>{index + 1}</strong>
                 <span>{playerStats.name}</span>
-                <span>{formatPoint(playerStats.totalPoint)}</span>
-                <small>{playerStats.matchCount}半荘</small>
+                <span>{formatSortValue(playerStats, sortKey)}</span>
+                <small>
+                  {SORT_LABELS.get(sortKey)} {sortDirectionLabel(sortKey)}
+                </small>
               </button>
             ))}
           </div>
