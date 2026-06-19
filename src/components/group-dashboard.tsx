@@ -23,7 +23,7 @@ type DashboardView = "groups" | "ranking" | "matches" | "players" | "rules" | "p
 
 const VIEW_LABELS: Array<{ key: Exclude<DashboardView, "groups">; label: string }> = [
   { key: "ranking", label: "ランキング" },
-  { key: "matches", label: "半荘" },
+  { key: "matches", label: "対局" },
   { key: "players", label: "メンバー" },
   { key: "rules", label: "ルール" },
 ];

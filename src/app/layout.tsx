@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "麻雀成績管理",
-  description: "半荘とプレイヤー成績を管理する麻雀アプリ",
+  description: "対局ごとの半荘とプレイヤー成績を管理する麻雀アプリ",
 };
 
 export default function RootLayout({

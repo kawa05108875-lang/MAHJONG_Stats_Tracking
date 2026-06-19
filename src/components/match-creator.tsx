@@ -179,7 +179,7 @@ function matchBlockStartedDate(match: MatchSummary) {
 }
 
 function matchNumberLabel(match: MatchSummary, index: number) {
-  return `${match.matchBlockNumber ?? index + 1}半荘目`;
+  return `第${match.matchBlockNumber ?? index + 1}半荘`;
 }
 
 function dateToUtcDay(date: string) {
@@ -453,11 +453,11 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       const message =
         loadError instanceof Error
           ? loadError.message
-          : "半荘作成に必要なデータ取得に失敗しました。";
+          : "対局データの取得に失敗しました。";
 
       setError(
         message.includes("permission")
-          ? "半荘データを取得できませんでした。Firestore Security Rulesを確認してください。"
+          ? "対局データを取得できませんでした。Firestore Security Rulesを確認してください。"
           : message,
       );
     } finally {
@@ -576,11 +576,11 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       const message =
         deleteError instanceof Error
           ? deleteError.message
-          : "半荘データの削除に失敗しました。";
+          : "対局データの削除に失敗しました。";
 
       setError(
         message.includes("permission")
-          ? "半荘データを削除できませんでした。Firestore Security Rulesを確認してください。"
+          ? "対局データを削除できませんでした。Firestore Security Rulesを確認してください。"
           : message,
       );
     } finally {
@@ -595,7 +595,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
     if (mode === "shuffle" && recentSamePlayerMatchCount % 4 !== 0) {
       const confirmed = window.confirm(
-        `同じ4人でまだ${recentSamePlayerMatchCount}半荘目です。4半荘前ですが席替えしますか？`,
+        `同じ4人でまだ第${recentSamePlayerMatchCount}半荘です。4半荘前ですが席替えしますか？`,
       );
 
       if (!confirmed) {
@@ -649,7 +649,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
     if (recentSamePlayerMatchCount % 4 !== 0) {
       const confirmed = window.confirm(
-        `同じ4人でまだ${recentSamePlayerMatchCount}半荘目です。4半荘前ですが席替えしますか？`,
+        `同じ4人でまだ第${recentSamePlayerMatchCount}半荘です。4半荘前ですが席替えしますか？`,
       );
 
       if (!confirmed) {
@@ -689,7 +689,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
               ? "半荘作成"
               : matchView === "entry"
                 ? "局の結果入力"
-                : "半荘"}
+                : "対局"}
           </h3>
         </div>
         <div className="row-actions">
@@ -788,7 +788,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       {matchView === "create" || matchView === "entry" ? (
         <div className="bottom-navigation-actions">
           <button type="button" onClick={returnToList}>
-            半荘一覧へ
+            対局一覧へ
           </button>
         </div>
       ) : null}
@@ -796,9 +796,9 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       {matchView === "list" ? (
         <div className="match-list">
         <h4>対局ブロック</h4>
-        {loading ? <p className="muted">半荘を読み込んでいます...</p> : null}
+        {loading ? <p className="muted">対局履歴を読み込んでいます...</p> : null}
         {!loading && matches.length === 0 ? (
-          <p className="empty-state">まだ半荘がありません。</p>
+          <p className="empty-state">まだ対局記録がありません。</p>
         ) : null}
         {matchBlocks.slice(0, 5).map((block) => (
           <section key={block.blockId} className="match-block">

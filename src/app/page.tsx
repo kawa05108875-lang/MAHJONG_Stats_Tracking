@@ -18,7 +18,7 @@ export default function Home() {
           <p className="eyebrow">Mahjong Score Manager</p>
           <h1>麻雀成績管理</h1>
           <p className="lead">
-            半荘、局結果、プレイヤー別成績を管理するための初期セットアップです。
+            対局ごとの半荘、局結果、プレイヤー別成績を管理するための初期セットアップです。
           </p>
 
           {!isFirebaseConfigured ? (
