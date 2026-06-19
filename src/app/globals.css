@@ -656,6 +656,15 @@ select:focus {
   overflow-x: auto;
 }
 
+.result-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.result-actions button {
+  min-height: 34px;
+}
+
 .result-table {
   display: grid;
   gap: 8px;

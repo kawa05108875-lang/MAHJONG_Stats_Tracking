@@ -24,6 +24,7 @@ export type MatchSummary = Pick<
   | "currentHonba"
   | "currentRiichiSticks"
   | "finalResults"
+  | "createdAt"
 >;
 
 export async function createMatch(params: {
@@ -89,9 +90,21 @@ export async function getGroupMatches(groupId: string): Promise<MatchSummary[]> 
         currentHonba: match.currentHonba,
         currentRiichiSticks: match.currentRiichiSticks,
         finalResults: match.finalResults,
+        createdAt: match.createdAt,
       } satisfies MatchSummary;
     })
-    .sort((left, right) => right.date.localeCompare(left.date));
+    .sort((left, right) => {
+      const dateDiff = right.date.localeCompare(left.date);
+
+      if (dateDiff !== 0) {
+        return dateDiff;
+      }
+
+      const leftSeconds = "seconds" in left.createdAt ? left.createdAt.seconds : 0;
+      const rightSeconds = "seconds" in right.createdAt ? right.createdAt.seconds : 0;
+
+      return rightSeconds - leftSeconds;
+    });
 }
 
 export async function finishMatch(params: {

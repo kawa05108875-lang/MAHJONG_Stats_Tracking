@@ -23,11 +23,99 @@ type MatchCreatorProps = {
 };
 
 type MatchView = "list" | "create" | "entry";
+type NextMatchMode = "rotate" | "shuffle";
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeMatchPlayers(players: MatchPlayer[]) {
+  return [...players].sort((left, right) => left.seatIndex - right.seatIndex);
+}
+
+function samePlayerSet(leftPlayers: MatchPlayer[], rightPlayers: MatchPlayer[]) {
+  const leftIds = leftPlayers.map((player) => player.playerId).sort();
+  const rightIds = rightPlayers.map((player) => player.playerId).sort();
+
+  return leftIds.length === rightIds.length && leftIds.every((playerId, index) => playerId === rightIds[index]);
+}
+
+function sameSeatOrder(leftPlayers: MatchPlayer[], rightPlayers: MatchPlayer[]) {
+  const leftSeatedPlayers = normalizeMatchPlayers(leftPlayers);
+  const rightSeatedPlayers = normalizeMatchPlayers(rightPlayers);
+
+  return leftSeatedPlayers.every(
+    (player, index) => player.playerId === rightSeatedPlayers[index]?.playerId,
+  );
+}
+
+function rotateDealer(players: MatchPlayer[]) {
+  const seatedPlayers = normalizeMatchPlayers(players);
+
+  return seatedPlayers.map((_, index) => {
+    const player = seatedPlayers[(index + 1) % seatedPlayers.length];
+
+    return {
+      ...player,
+      seatIndex: index as SeatIndex,
+    };
+  });
+}
+
+function shuffleSeats(players: MatchPlayer[]) {
+  const shuffledPlayers = normalizeMatchPlayers(players);
+
+  for (let index = shuffledPlayers.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffledPlayers[index], shuffledPlayers[randomIndex]] = [
+      shuffledPlayers[randomIndex],
+      shuffledPlayers[index],
+    ];
+  }
+
+  if (sameSeatOrder(shuffledPlayers, players) && shuffledPlayers.length > 1) {
+    [shuffledPlayers[0], shuffledPlayers[1]] = [shuffledPlayers[1], shuffledPlayers[0]];
+  }
+
+  return shuffledPlayers.map((player, index) => ({
+    ...player,
+    seatIndex: index as SeatIndex,
+  }));
+}
+
+function countRecentRotatedMatches(
+  matches: MatchSummary[],
+  selectedMatch: MatchSummary | null,
+) {
+  if (!selectedMatch) {
+    return 0;
+  }
+
+  const startIndex = matches.findIndex((match) => match.matchId === selectedMatch.matchId);
+
+  if (startIndex < 0) {
+    return 0;
+  }
+
+  let count = 0;
+  let currentMatch: MatchSummary | null = null;
+
+  for (const match of matches.slice(startIndex)) {
+    if (!samePlayerSet(match.players, selectedMatch.players)) {
+      break;
+    }
+
+    if (currentMatch && !sameSeatOrder(rotateDealer(match.players), currentMatch.players)) {
+      break;
+    }
+
+    count += 1;
+    currentMatch = match;
+  }
+
+  return count;
 }
 
 function statusLabel(status: MatchSummary["status"]) {
@@ -42,7 +130,19 @@ function statusLabel(status: MatchSummary["status"]) {
   return "キャンセル";
 }
 
-function MatchResultPanel({ results }: { results: MatchFinalResult[] }) {
+function MatchResultPanel({
+  results,
+  rotateNotice,
+  startingNextMatch,
+  onStartNextMatch,
+  onShuffleSeats,
+}: {
+  results: MatchFinalResult[];
+  rotateNotice: string | null;
+  startingNextMatch: NextMatchMode | null;
+  onStartNextMatch: () => void;
+  onShuffleSeats: () => void;
+}) {
   return (
     <section className="result-panel">
       <div className="section-header">
@@ -65,6 +165,24 @@ function MatchResultPanel({ results }: { results: MatchFinalResult[] }) {
           </div>
         ))}
       </div>
+      {rotateNotice ? <p className="notice-text">{rotateNotice}</p> : null}
+      <div className="row-actions result-actions">
+        <button
+          type="button"
+          className="primary-inline-button"
+          disabled={startingNextMatch !== null}
+          onClick={onStartNextMatch}
+        >
+          {startingNextMatch === "rotate" ? "作成中..." : "次の半荘を開始"}
+        </button>
+        <button
+          type="button"
+          disabled={startingNextMatch !== null}
+          onClick={onShuffleSeats}
+        >
+          {startingNextMatch === "shuffle" ? "作成中..." : "席替え"}
+        </button>
+      </div>
     </section>
   );
 }
@@ -77,6 +195,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
+  const [startingNextMatch, setStartingNextMatch] = useState<NextMatchMode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -107,6 +226,16 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     () => matches.find((match) => match.matchId === selectedMatchId) ?? null,
     [matches, selectedMatchId],
   );
+  const recentSamePlayerMatchCount = useMemo(
+    () => countRecentRotatedMatches(matches, selectedMatch),
+    [matches, selectedMatch],
+  );
+  const rotateNotice =
+    selectedMatch?.status === "finished" && recentSamePlayerMatchCount > 0
+      ? recentSamePlayerMatchCount % 4 === 0
+        ? "同じ4人で4半荘が終わりました。席替えの目安です。"
+        : `同じ4人で${recentSamePlayerMatchCount}半荘目です。4半荘で席替えが目安です。`
+      : null;
   const uniqueSelectedPlayerCount = new Set(selectedPlayerIds).size;
   const canCreateMatch =
     selectedPlayers.length === 4 &&
@@ -278,6 +407,57 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     }
   }
 
+  async function createFollowUpMatch(mode: NextMatchMode) {
+    if (!selectedMatch) {
+      return;
+    }
+
+    if (mode === "shuffle" && recentSamePlayerMatchCount % 4 !== 0) {
+      const confirmed = window.confirm(
+        `同じ4人でまだ${recentSamePlayerMatchCount}半荘目です。4半荘前ですが席替えしますか？`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setStartingNextMatch(mode);
+    setError(null);
+    setCreatedMatchId(null);
+
+    try {
+      const nextPlayers =
+        mode === "rotate" ? rotateDealer(selectedMatch.players) : shuffleSeats(selectedMatch.players);
+      const matchId = await createMatch({
+        groupId: group.groupId,
+        date: todayString(),
+        players: nextPlayers,
+        dealerPlayerId: nextPlayers[0].playerId,
+        rule: group.defaultRule,
+        uid: user.uid,
+      });
+
+      setCreatedMatchId(matchId);
+      setSelectedMatchId(matchId);
+      setMatchView("entry");
+      await loadData();
+    } catch (createError) {
+      const message =
+        createError instanceof Error
+          ? createError.message
+          : "次の半荘作成に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "次の半荘を作成できませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setStartingNextMatch(null);
+    }
+  }
+
   function openMatch(matchId: string) {
     setSelectedMatchId(matchId);
     setCreatedMatchId(null);
@@ -380,7 +560,13 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       {matchView === "entry" &&
       selectedMatch?.status === "finished" &&
       selectedMatch.finalResults ? (
-        <MatchResultPanel results={selectedMatch.finalResults} />
+        <MatchResultPanel
+          results={selectedMatch.finalResults}
+          rotateNotice={rotateNotice}
+          startingNextMatch={startingNextMatch}
+          onStartNextMatch={() => void createFollowUpMatch("rotate")}
+          onShuffleSeats={() => void createFollowUpMatch("shuffle")}
+        />
       ) : matchView === "entry" && selectedMatch ? (
         <HandEntry
           key={selectedMatch.matchId}
