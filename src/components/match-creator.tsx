@@ -146,16 +146,39 @@ function formatRecentResults(results: MatchFinalResult[] | null) {
 function MatchResultPanel({
   results,
   rotateNotice,
+  shouldPrioritizeShuffle,
   startingNextMatch,
   onStartNextMatch,
   onShuffleSeats,
 }: {
   results: MatchFinalResult[];
   rotateNotice: string | null;
+  shouldPrioritizeShuffle: boolean;
   startingNextMatch: NextMatchMode | null;
   onStartNextMatch: () => void;
   onShuffleSeats: () => void;
 }) {
+  const nextMatchButton = (
+    <button
+      type="button"
+      className="primary-inline-button"
+      disabled={startingNextMatch !== null}
+      onClick={onStartNextMatch}
+    >
+      {startingNextMatch === "rotate" ? "作成中..." : "次の半荘を開始"}
+    </button>
+  );
+  const shuffleButton = (
+    <button
+      type="button"
+      className={shouldPrioritizeShuffle ? "primary-inline-button" : ""}
+      disabled={startingNextMatch !== null}
+      onClick={onShuffleSeats}
+    >
+      {startingNextMatch === "shuffle" ? "作成中..." : "席替え"}
+    </button>
+  );
+
   return (
     <section className="result-panel">
       <div className="section-header">
@@ -180,21 +203,8 @@ function MatchResultPanel({
       </div>
       {rotateNotice ? <p className="notice-text">{rotateNotice}</p> : null}
       <div className="row-actions result-actions">
-        <button
-          type="button"
-          className="primary-inline-button"
-          disabled={startingNextMatch !== null}
-          onClick={onStartNextMatch}
-        >
-          {startingNextMatch === "rotate" ? "作成中..." : "次の半荘を開始"}
-        </button>
-        <button
-          type="button"
-          disabled={startingNextMatch !== null}
-          onClick={onShuffleSeats}
-        >
-          {startingNextMatch === "shuffle" ? "作成中..." : "席替え"}
-        </button>
+        {shouldPrioritizeShuffle ? shuffleButton : nextMatchButton}
+        {shouldPrioritizeShuffle ? nextMatchButton : shuffleButton}
       </div>
     </section>
   );
@@ -243,11 +253,13 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     () => countRecentRotatedMatches(matches, selectedMatch),
     [matches, selectedMatch],
   );
+  const shouldSuggestSeatShuffle =
+    selectedMatch?.status === "finished" &&
+    recentSamePlayerMatchCount > 0 &&
+    recentSamePlayerMatchCount % 4 === 0;
   const rotateNotice =
-    selectedMatch?.status === "finished" && recentSamePlayerMatchCount > 0
-      ? recentSamePlayerMatchCount % 4 === 0
-        ? "同じ4人で4半荘が終わりました。席替えの目安です。"
-        : `同じ4人で${recentSamePlayerMatchCount}半荘目です。4半荘で席替えが目安です。`
+    shouldSuggestSeatShuffle
+      ? "親が一周しました。基本は席替えのタイミングです。"
       : null;
   const uniqueSelectedPlayerCount = new Set(selectedPlayerIds).size;
   const canCreateMatch =
@@ -576,6 +588,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         <MatchResultPanel
           results={selectedMatch.finalResults}
           rotateNotice={rotateNotice}
+          shouldPrioritizeShuffle={shouldSuggestSeatShuffle}
           startingNextMatch={startingNextMatch}
           onStartNextMatch={() => void createFollowUpMatch("rotate")}
           onShuffleSeats={() => void createFollowUpMatch("shuffle")}
