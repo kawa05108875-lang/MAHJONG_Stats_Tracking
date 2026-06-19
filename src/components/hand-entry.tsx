@@ -610,9 +610,6 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             {formatRound(match.currentRound)} {match.currentHonba}本場
           </h3>
         </div>
-        <button type="button" onClick={loadHands} disabled={loading}>
-          更新
-        </button>
       </div>
 
       <form className="match-form" onSubmit={handleSubmit}>
