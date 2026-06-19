@@ -213,7 +213,6 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                   onClick={() => handleSelectGroup(group.groupId)}
                 >
                   <span>{group.name}</span>
-                  <small>開始 {group.defaultRule.initialScore.toLocaleString()}点</small>
                 </button>
               ))}
             </div>
