@@ -33,6 +33,8 @@ function notifyStatsChanged(groupId: string) {
 }
 
 const HOUSE_LABELS = ["東", "南", "西", "北"] as const;
+const RON_HONBA_BONUS = 300;
+const TSUMO_HONBA_BONUS = 100;
 
 function parseScore(value: string) {
   const parsed = Number(value);
@@ -202,6 +204,12 @@ function calculateWinScoreDeltas(params: {
   const riichiStickPoint =
     (params.match.currentRiichiSticks + params.riichiPlayerIds.length) * 1000;
   const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
+  const ronPointWithHonba =
+    params.ronPoint + params.match.currentHonba * RON_HONBA_BONUS;
+  const dealerTsumoPointWithHonba =
+    params.dealerTsumoPoint + params.match.currentHonba * TSUMO_HONBA_BONUS;
+  const childTsumoPointWithHonba =
+    params.childTsumoPoint + params.match.currentHonba * TSUMO_HONBA_BONUS;
 
   return params.match.players.map((player) => {
     const isWinner = player.playerId === params.winnerPlayerId;
@@ -212,9 +220,9 @@ function calculateWinScoreDeltas(params: {
 
     if (params.winType === "ron") {
       if (isWinner) {
-        handDelta = params.ronPoint + riichiStickPoint;
+        handDelta = ronPointWithHonba + riichiStickPoint;
       } else if (isLoser) {
-        handDelta = -params.ronPoint;
+        handDelta = -ronPointWithHonba;
       }
     } else {
       const winnerIsDealer = params.winnerPlayerId === currentDealerPlayerId;
@@ -224,25 +232,25 @@ function calculateWinScoreDeltas(params: {
           .filter((candidate) => candidate.playerId !== params.winnerPlayerId)
           .reduce((total, candidate) => {
             if (winnerIsDealer) {
-              return total + params.dealerTsumoPoint;
+              return total + dealerTsumoPointWithHonba;
             }
 
             return (
               total +
               (candidate.playerId === currentDealerPlayerId
-                ? params.dealerTsumoPoint
-                : params.childTsumoPoint)
+                ? dealerTsumoPointWithHonba
+                : childTsumoPointWithHonba)
             );
           }, 0);
 
         handDelta = paymentTotal + riichiStickPoint;
       } else if (winnerIsDealer) {
-        handDelta = -params.dealerTsumoPoint;
+        handDelta = -dealerTsumoPointWithHonba;
       } else {
         handDelta =
           player.playerId === currentDealerPlayerId
-            ? -params.dealerTsumoPoint
-            : -params.childTsumoPoint;
+            ? -dealerTsumoPointWithHonba
+            : -childTsumoPointWithHonba;
       }
     }
 
@@ -366,6 +374,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     handType === "draw" || scoreDeltaTotal === expectedScoreDeltaTotal;
   const nextRiichiSticks =
     handType === "draw" ? match.currentRiichiSticks + riichiPlayerIds.length : 0;
+  const ronHonbaBonus = match.currentHonba * RON_HONBA_BONUS;
+  const tsumoHonbaBonus = match.currentHonba * TSUMO_HONBA_BONUS;
   const currentDealerPlayerId = getCurrentDealerPlayerId(match);
   const currentSeatPlayers = useMemo(() => getCurrentSeatPlayers(match), [match]);
   const winnerIsDealer = winnerPlayerId === currentDealerPlayerId;
@@ -728,7 +738,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                   </select>
                 </label>
                 <label>
-                  <span className="label">ロン支払い点</span>
+                  <span className="label">ロン支払い点（粗点・本場なし）</span>
                   <input
                     inputMode="numeric"
                     value={ronPoint}
@@ -740,7 +750,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             ) : winnerPlayerId ? (
               winnerIsDealer ? (
                 <label>
-                  <span className="label">親ツモ 各自支払い点</span>
+                  <span className="label">親ツモ 各自支払い点（粗点・本場なし）</span>
                   <input
                     inputMode="numeric"
                     value={dealerTsumoPoint}
@@ -751,7 +761,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               ) : (
                 <div className="score-input-grid">
                   <label>
-                    <span>子ツモ 親支払い点</span>
+                    <span>子ツモ 親支払い点（粗点・本場なし）</span>
                     <input
                       inputMode="numeric"
                       value={dealerTsumoPoint}
@@ -760,7 +770,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                     />
                   </label>
                   <label>
-                    <span>子ツモ 子支払い点</span>
+                    <span>子ツモ 子支払い点（粗点・本場なし）</span>
                     <input
                       inputMode="numeric"
                       value={childTsumoPoint}
@@ -771,6 +781,15 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 </div>
               )
             ) : null}
+
+            <div className="notice">
+              <strong>本場は自動加算</strong>
+              <span>
+                入力するのは粗点の支払い点だけです。{match.currentHonba}本場なので、
+                ロンは放銃者の支払いに+{ronHonbaBonus.toLocaleString()}点、ツモは各家の支払いに+
+                {tsumoHonbaBonus.toLocaleString()}点を自動で足します。
+              </span>
+            </div>
 
             <div className="notice">
               <strong>供託回収</strong>
