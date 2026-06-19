@@ -754,23 +754,27 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
 
       <form className="match-form" onSubmit={handleSubmit}>
         {!handTypeSelected ? (
-          <div className="segmented-control">
-            {(["win", "draw", "abortive-draw", "penalty"] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                disabled={type === "abortive-draw" && enabledAbortiveDrawOptions.length === 0}
-                onClick={() => selectHandType(type)}
-              >
-                {type === "win"
-                  ? "和了"
-                  : type === "draw"
-                    ? "流局"
-                    : type === "abortive-draw"
-                      ? "途中流局"
-                      : "罰符"}
-              </button>
-            ))}
+          <div className="hand-type-selector">
+            <div className="segmented-control compact">
+              {(["win", "draw"] as const).map((type) => (
+                <button key={type} type="button" onClick={() => selectHandType(type)}>
+                  {type === "win" ? "和了" : "流局"}
+                </button>
+              ))}
+            </div>
+            <div className="minor-action-row">
+              {(["abortive-draw", "penalty"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className="compact-action-button"
+                  disabled={type === "abortive-draw" && enabledAbortiveDrawOptions.length === 0}
+                  onClick={() => selectHandType(type)}
+                >
+                  {type === "abortive-draw" ? "途中流局" : "罰符"}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <>

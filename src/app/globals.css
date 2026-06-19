@@ -740,6 +740,21 @@ select:focus {
   color: var(--primary-strong);
 }
 
+.hand-type-selector {
+  display: grid;
+  gap: 8px;
+}
+
+.minor-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.minor-action-row .compact-action-button {
+  color: var(--muted);
+}
+
 .sticky-action {
   position: sticky;
   bottom: 12px;
