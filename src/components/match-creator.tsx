@@ -33,9 +33,14 @@ type MatchBlockPlayerTotal = {
 type MatchBlockSummary = {
   blockId: string;
   matches: MatchSummary[];
-  dateLabel: string;
+  startedDate: string;
   finishedMatchCount: number;
   playerTotals: MatchBlockPlayerTotal[];
+};
+type MatchBlockAssignment = {
+  matchBlockId?: string;
+  matchBlockNumber?: number;
+  matchBlockStartedDate?: string;
 };
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
@@ -164,22 +169,28 @@ function matchBlockId(match: MatchSummary) {
   return match.matchBlockId ?? `legacy-${match.matchId}`;
 }
 
+function matchBlockStartedDate(match: MatchSummary) {
+  return match.matchBlockStartedDate ?? match.date;
+}
+
 function matchNumberLabel(match: MatchSummary, index: number) {
   return `${match.matchBlockNumber ?? index + 1}半荘目`;
 }
 
-function createDateRangeLabel(matches: MatchSummary[]) {
-  const dates = [...new Set(matches.map((match) => match.date))].sort();
+function dateToUtcDay(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
 
-  if (dates.length === 0) {
-    return "-";
-  }
+  return Date.UTC(year, month - 1, day) / 86_400_000;
+}
 
-  if (dates[0] === dates[dates.length - 1]) {
-    return dates[0];
-  }
+function daysBetween(leftDate: string, rightDate: string) {
+  return dateToUtcDay(rightDate) - dateToUtcDay(leftDate);
+}
 
-  return `${dates[0]} - ${dates[dates.length - 1]}`;
+function isWithinSameMatchBlock(previousDate: string, nextDate: string) {
+  const dayDiff = daysBetween(previousDate, nextDate);
+
+  return dayDiff >= 0 && dayDiff < 2;
 }
 
 function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[] {
@@ -231,7 +242,7 @@ function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[]
       return {
         blockId,
         matches: sortedMatches,
-        dateLabel: createDateRangeLabel(sortedMatches),
+        startedDate: matchBlockStartedDate(sortedMatches[0]),
         finishedMatchCount: sortedMatches.filter((match) => match.status === "finished").length,
         playerTotals: Array.from(playerTotals.values()).sort((left, right) => {
           const pointDiff = right.totalPoint - left.totalPoint;
@@ -255,6 +266,29 @@ function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[]
 
       return timestampSeconds(rightLatest.createdAt) - timestampSeconds(leftLatest.createdAt);
     });
+}
+
+function determineMatchBlockAssignment(
+  matches: MatchSummary[],
+  date: string,
+  preferredMatch?: MatchSummary | null,
+): MatchBlockAssignment {
+  const referenceMatch = preferredMatch ?? matches[0] ?? null;
+
+  if (!referenceMatch || !isWithinSameMatchBlock(referenceMatch.date, date)) {
+    return {
+      matchBlockStartedDate: date,
+    };
+  }
+
+  const blockId = matchBlockId(referenceMatch);
+  const blockMatches = matches.filter((match) => matchBlockId(match) === blockId);
+
+  return {
+    matchBlockId: blockId,
+    matchBlockNumber: blockMatches.length + 1,
+    matchBlockStartedDate: matchBlockStartedDate(blockMatches[0] ?? referenceMatch),
+  };
 }
 
 function MatchResultPanel({
@@ -471,9 +505,11 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     setCreatedMatchId(null);
 
     try {
+      const blockAssignment = determineMatchBlockAssignment(matches, date);
       const matchId = await createMatch({
         groupId: group.groupId,
         date,
+        ...blockAssignment,
         players: selectedPlayers,
         dealerPlayerId: seatPlayerIds[0],
         rule: group.defaultRule,
@@ -568,15 +604,12 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     try {
       const nextPlayers =
         mode === "rotate" ? rotateDealer(selectedMatch.players) : shuffleSeats(selectedMatch.players);
-      const currentBlockId = matchBlockId(selectedMatch);
-      const currentBlockMatchCount = matches.filter(
-        (match) => matchBlockId(match) === currentBlockId,
-      ).length;
+      const nextDate = todayString();
+      const blockAssignment = determineMatchBlockAssignment(matches, nextDate, selectedMatch);
       const matchId = await createMatch({
         groupId: group.groupId,
-        date: todayString(),
-        matchBlockId: currentBlockId,
-        matchBlockNumber: currentBlockMatchCount + 1,
+        date: nextDate,
+        ...blockAssignment,
         players: nextPlayers,
         dealerPlayerId: nextPlayers[0].playerId,
         rule: group.defaultRule,
@@ -761,7 +794,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
           <section key={block.blockId} className="match-block">
             <div className="match-block-header">
               <div>
-                <strong>{block.dateLabel}</strong>
+                <strong>{block.startedDate} の対局</strong>
                 <span className="muted">
                   {block.matches.length}半荘 / 終了 {block.finishedMatchCount}半荘
                 </span>
@@ -783,7 +816,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
                 return (
                   <div key={match.matchId} className="match-row">
                     <div>
-                      <strong>{matchNumberLabel(match, index)} / {match.date}</strong>
+                      <strong>{matchNumberLabel(match, index)}</strong>
                       <span className="muted">
                         {match.players.map((player) => player.name).join(" / ")}
                       </span>
