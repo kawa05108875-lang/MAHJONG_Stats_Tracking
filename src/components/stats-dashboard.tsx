@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getGroupPlayerStats,
-  recalculateGroupPlayerStats,
   type PlayerStatsSummary,
 } from "@/lib/firestore/stats";
 
@@ -51,7 +50,6 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("totalPoint");
   const [loading, setLoading] = useState(true);
-  const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadStats = useCallback(async () => {
@@ -106,27 +104,6 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
     };
   }, [groupId, loadStats]);
 
-  async function handleRecalculate() {
-    setRecalculating(true);
-    setError(null);
-
-    try {
-      await recalculateGroupPlayerStats(groupId);
-      await loadStats();
-    } catch (recalculateError) {
-      const message =
-        recalculateError instanceof Error ? recalculateError.message : "成績の再計算に失敗しました。";
-
-      setError(
-        message.includes("permission")
-          ? "成績を再計算できませんでした。Firestore Security Rulesを確認してください。"
-          : message,
-      );
-    } finally {
-      setRecalculating(false);
-    }
-  }
-
   const rankedStats = useMemo(
     () => [...stats].sort((left, right) => compareStats(left, right, sortKey)),
     [sortKey, stats],
@@ -140,14 +117,6 @@ export function StatsDashboard({ groupId }: StatsDashboardProps) {
         <div>
           <p className="eyebrow">Stats</p>
           <h3>ランキング</h3>
-        </div>
-        <div className="row-actions">
-          <button type="button" onClick={loadStats} disabled={loading}>
-            更新
-          </button>
-          <button type="button" onClick={handleRecalculate} disabled={recalculating}>
-            {recalculating ? "再計算中..." : "再計算"}
-          </button>
         </div>
       </div>
 
