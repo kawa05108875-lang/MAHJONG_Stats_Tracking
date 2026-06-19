@@ -615,51 +615,6 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         </button>
       </div>
 
-      <div className="score-grid hand-scoreboard">
-        {currentSeatPlayers.map((player) => (
-          <div
-            key={player.playerId}
-            className={`metric ${player.playerId === currentDealerPlayerId ? "current-dealer" : ""}`}
-          >
-            <span className="seat-label">
-              {getCurrentHouseLabel(match, player.seatIndex)}
-              {player.playerId === currentDealerPlayerId ? " / 親" : ""}
-            </span>
-            <span className="label">{player.name}</span>
-            <strong>{currentScores[player.playerId]?.toLocaleString() ?? "-"}</strong>
-          </div>
-        ))}
-      </div>
-
-      <div className="result-panel">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Final Preview</p>
-            <h4>半荘結果プレビュー</h4>
-          </div>
-          <button type="button" onClick={handleFinishMatch} disabled={finishing || loading}>
-            {finishing ? "保存中..." : "半荘を終了"}
-          </button>
-        </div>
-        <div className="result-table">
-          {finalResults.map((result) => (
-            <div key={result.playerId} className="result-row">
-              <strong>{result.rank}位</strong>
-              <span>{result.name}</span>
-              <span>{result.finalScore.toLocaleString()}点</span>
-              <span>
-                {result.rawPoint.toFixed(1)} + {result.uma.toFixed(1)} +{" "}
-                {result.oka.toFixed(1)}
-              </span>
-              <strong>{result.totalPoint.toFixed(1)}pt</strong>
-            </div>
-          ))}
-        </div>
-        {match.currentRiichiSticks > 0 ? (
-          <p className="error">供託が{match.currentRiichiSticks}本残っています。</p>
-        ) : null}
-      </div>
-
       <form className="match-form" onSubmit={handleSubmit}>
         <div className="segmented-control">
           {(["win", "draw", "penalty"] as const).map((type) => (
@@ -894,6 +849,36 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           局結果を保存
         </button>
       </form>
+
+      <div className="section-header">
+        <div>
+          <p className="eyebrow">Current Scores</p>
+          <h4>現在点</h4>
+        </div>
+        <button type="button" onClick={handleFinishMatch} disabled={finishing || loading}>
+          {finishing ? "保存中..." : "半荘を終了"}
+        </button>
+      </div>
+
+      <div className="score-grid hand-scoreboard">
+        {currentSeatPlayers.map((player) => (
+          <div
+            key={player.playerId}
+            className={`metric ${player.playerId === currentDealerPlayerId ? "current-dealer" : ""}`}
+          >
+            <span className="seat-label">
+              {getCurrentHouseLabel(match, player.seatIndex)}
+              {player.playerId === currentDealerPlayerId ? " / 親" : ""}
+            </span>
+            <span className="label">{player.name}</span>
+            <strong>{currentScores[player.playerId]?.toLocaleString() ?? "-"}</strong>
+          </div>
+        ))}
+      </div>
+
+      {match.currentRiichiSticks > 0 ? (
+        <p className="error">供託が{match.currentRiichiSticks}本残っています。</p>
+      ) : null}
 
       {error ? <p className="error">{error}</p> : null}
 
