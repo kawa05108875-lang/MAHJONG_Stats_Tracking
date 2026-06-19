@@ -37,6 +37,9 @@ service cloud.firestore {
           "dealerRepeatRule",
           "agariYameEnabled",
           "westRoundEnabled",
+          "abortiveDrawEnabled",
+          "doubleRonEnabled",
+          "tripleRonEnabled",
         ])
         && rule.keys().hasAll([
           "initialScore",
@@ -61,7 +64,31 @@ service cloud.firestore {
           || rule.dealerRepeatRule in ["dealer-win", "dealer-win-or-tenpai", "always"]
         )
         && (!("agariYameEnabled" in rule) || rule.agariYameEnabled is bool)
-        && (!("westRoundEnabled" in rule) || rule.westRoundEnabled is bool);
+        && (!("westRoundEnabled" in rule) || rule.westRoundEnabled is bool)
+        && (!("doubleRonEnabled" in rule) || rule.doubleRonEnabled is bool)
+        && (!("tripleRonEnabled" in rule) || rule.tripleRonEnabled is bool)
+        && (
+          !("abortiveDrawEnabled" in rule)
+          || (
+            rule.abortiveDrawEnabled is map
+            && rule.abortiveDrawEnabled.keys().hasOnly([
+              "nineTerminals",
+              "fourWinds",
+              "fourRiichi",
+              "fourKan",
+            ])
+            && rule.abortiveDrawEnabled.keys().hasAll([
+              "nineTerminals",
+              "fourWinds",
+              "fourRiichi",
+              "fourKan",
+            ])
+            && rule.abortiveDrawEnabled.nineTerminals is bool
+            && rule.abortiveDrawEnabled.fourWinds is bool
+            && rule.abortiveDrawEnabled.fourRiichi is bool
+            && rule.abortiveDrawEnabled.fourKan is bool
+          )
+        );
     }
 
     function isValidRound(round) {
@@ -420,6 +447,8 @@ service cloud.firestore {
           "riichiSticksBefore",
           "handType",
           "winType",
+          "abortiveDrawType",
+          "abortiveDrawProgression",
           "riichiPlayerIds",
           "winnerPlayerId",
           "loserPlayerId",
@@ -454,10 +483,23 @@ service cloud.firestore {
         && request.resource.data.honba >= 0
         && request.resource.data.riichiSticksBefore is number
         && request.resource.data.riichiSticksBefore >= 0
-        && request.resource.data.handType in ["win", "draw", "penalty"]
+        && request.resource.data.handType in ["win", "draw", "abortive-draw", "penalty"]
         && (
           !("winType" in request.resource.data)
           || request.resource.data.winType in ["tsumo", "ron"]
+        )
+        && (
+          !("abortiveDrawType" in request.resource.data)
+          || request.resource.data.abortiveDrawType in [
+            "nineTerminals",
+            "fourWinds",
+            "fourRiichi",
+            "fourKan",
+          ]
+        )
+        && (
+          !("abortiveDrawProgression" in request.resource.data)
+          || request.resource.data.abortiveDrawProgression in ["repeat", "advance"]
         )
         && request.resource.data.riichiPlayerIds is list
         && (
