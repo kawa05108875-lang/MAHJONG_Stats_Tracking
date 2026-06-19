@@ -194,9 +194,28 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                 <p className="eyebrow">Groups</p>
                 <h2>グループを選択</h2>
               </div>
-              <button type="button" onClick={loadGroups} disabled={loading}>
-                更新
-              </button>
+            </div>
+
+            {loading ? <p className="muted">グループを読み込んでいます...</p> : null}
+
+            {!loading && groups.length === 0 ? (
+              <p className="empty-state">まだグループがありません。</p>
+            ) : null}
+
+            <div className="group-list">
+              {groups.map((group) => (
+                <button
+                  key={group.groupId}
+                  type="button"
+                  className={
+                    group.groupId === selectedGroupId ? "group-item is-active" : "group-item"
+                  }
+                  onClick={() => handleSelectGroup(group.groupId)}
+                >
+                  <span>{group.name}</span>
+                  <small>開始 {group.defaultRule.initialScore.toLocaleString()}点</small>
+                </button>
+              ))}
             </div>
 
             <form className="form-grid" onSubmit={handleCreateGroup}>
@@ -229,28 +248,6 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                 </button>
               </div>
             </form>
-
-            {loading ? <p className="muted">グループを読み込んでいます...</p> : null}
-
-            {!loading && groups.length === 0 ? (
-              <p className="empty-state">まだグループがありません。</p>
-            ) : null}
-
-            <div className="group-list">
-              {groups.map((group) => (
-                <button
-                  key={group.groupId}
-                  type="button"
-                  className={
-                    group.groupId === selectedGroupId ? "group-item is-active" : "group-item"
-                  }
-                  onClick={() => handleSelectGroup(group.groupId)}
-                >
-                  <span>{group.name}</span>
-                  <small>開始 {group.defaultRule.initialScore.toLocaleString()}点</small>
-                </button>
-              ))}
-            </div>
           </section>
         ) : (
           <section className="content-area">
