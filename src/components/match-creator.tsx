@@ -130,6 +130,19 @@ function statusLabel(status: MatchSummary["status"]) {
   return "キャンセル";
 }
 
+function formatRecentResults(results: MatchFinalResult[] | null) {
+  if (!results?.length) {
+    return [];
+  }
+
+  return [...results]
+    .sort((left, right) => left.rank - right.rank)
+    .map((result) => ({
+      playerId: result.playerId,
+      label: `${result.rank}位 ${result.name} ${result.totalPoint.toFixed(1)}pt`,
+    }));
+}
+
 function MatchResultPanel({
   results,
   rotateNotice,
@@ -585,34 +598,45 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         {!loading && matches.length === 0 ? (
           <p className="empty-state">まだ半荘がありません。</p>
         ) : null}
-        {matches.slice(0, 5).map((match) => (
-          <div key={match.matchId} className="match-row">
-            <div>
-              <strong>{match.date}</strong>
-              <span className="muted">
-                {match.players.map((player) => player.name).join(" / ")}
+        {matches.slice(0, 5).map((match) => {
+          const recentResults = formatRecentResults(match.finalResults);
+
+          return (
+            <div key={match.matchId} className="match-row">
+              <div>
+                <strong>{match.date}</strong>
+                <span className="muted">
+                  {match.players.map((player) => player.name).join(" / ")}
+                </span>
+                {recentResults.length > 0 ? (
+                  <div className="match-result-summary">
+                    {recentResults.map((result) => (
+                      <span key={result.playerId}>{result.label}</span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <span className="status-pill linked">
+                {statusLabel(match.status)}
               </span>
+              <button
+                type="button"
+                className="compact-action-button"
+                onClick={() => openMatch(match.matchId)}
+              >
+                {match.status === "finished" ? "結果" : "局入力"}
+              </button>
+              <button
+                type="button"
+                className="compact-action-button danger-button"
+                onClick={() => void handleDeleteMatch(match)}
+                disabled={deletingMatchId === match.matchId}
+              >
+                {deletingMatchId === match.matchId ? "削除中..." : "削除"}
+              </button>
             </div>
-            <span className="status-pill linked">
-              {statusLabel(match.status)}
-            </span>
-            <button
-              type="button"
-              className="compact-action-button"
-              onClick={() => openMatch(match.matchId)}
-            >
-              {match.status === "finished" ? "結果" : "局入力"}
-            </button>
-            <button
-              type="button"
-              className="compact-action-button danger-button"
-              onClick={() => void handleDeleteMatch(match)}
-              disabled={deletingMatchId === match.matchId}
-            >
-              {deletingMatchId === match.matchId ? "削除中..." : "削除"}
-            </button>
-          </div>
-        ))}
+          );
+        })}
         </div>
       ) : null}
     </section>
