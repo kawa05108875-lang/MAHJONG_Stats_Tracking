@@ -259,7 +259,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     recentSamePlayerMatchCount % 4 === 0;
   const rotateNotice =
     shouldSuggestSeatShuffle
-      ? "親が一周しました。基本は席替えのタイミングです。"
+      ? "親が一周しました。"
       : null;
   const uniqueSelectedPlayerCount = new Set(selectedPlayerIds).size;
   const canCreateMatch =
@@ -483,6 +483,32 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     }
   }
 
+  function prepareShuffledMatchCreation() {
+    if (!selectedMatch) {
+      return;
+    }
+
+    if (recentSamePlayerMatchCount % 4 !== 0) {
+      const confirmed = window.confirm(
+        `同じ4人でまだ${recentSamePlayerMatchCount}半荘目です。4半荘前ですが席替えしますか？`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const nextPlayers = shuffleSeats(selectedMatch.players);
+
+    setDate(todayString());
+    setSeatPlayerIds(
+      normalizeMatchPlayers(nextPlayers).map((player) => player.playerId),
+    );
+    setCreatedMatchId(null);
+    setSelectedMatchId(null);
+    setMatchView("create");
+  }
+
   function openMatch(matchId: string) {
     setSelectedMatchId(matchId);
     setCreatedMatchId(null);
@@ -591,7 +617,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
           shouldPrioritizeShuffle={shouldSuggestSeatShuffle}
           startingNextMatch={startingNextMatch}
           onStartNextMatch={() => void createFollowUpMatch("rotate")}
-          onShuffleSeats={() => void createFollowUpMatch("shuffle")}
+          onShuffleSeats={prepareShuffledMatchCreation}
         />
       ) : matchView === "entry" && selectedMatch ? (
         <HandEntry
