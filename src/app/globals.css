@@ -736,6 +736,16 @@ select:focus {
   min-height: 34px;
 }
 
+.bottom-navigation-actions {
+  display: flex;
+  justify-content: flex-start;
+  padding-top: 10px;
+}
+
+.bottom-navigation-actions button {
+  min-height: 34px;
+}
+
 .result-table {
   display: grid;
   gap: 8px;

@@ -46,7 +46,12 @@ type MatchBlockAssignment = {
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
 
 function todayString() {
-  return new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function timestampSeconds(timestamp: MatchSummary["createdAt"]) {
@@ -351,7 +356,7 @@ function MatchResultPanel({
       </div>
       {rotateNotice ? <p className="notice-text">{rotateNotice}</p> : null}
       <div className="row-actions result-actions">
-        {nextMatchButton}
+        {shouldPrioritizeShuffle ? null : nextMatchButton}
         {shuffleButton}
       </div>
     </section>
@@ -696,11 +701,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             >
               新規半荘
             </button>
-          ) : (
-            <button type="button" onClick={returnToList}>
-              半荘一覧へ
-            </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -782,6 +783,14 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         />
       ) : matchView === "entry" ? (
         <p className="empty-state">半荘を選択してください。</p>
+      ) : null}
+
+      {matchView === "create" || matchView === "entry" ? (
+        <div className="bottom-navigation-actions">
+          <button type="button" onClick={returnToList}>
+            半荘一覧へ
+          </button>
+        </div>
       ) : null}
 
       {matchView === "list" ? (
