@@ -309,6 +309,7 @@ function MatchResultPanel({
   const nextMatchButton = (
     <button
       type="button"
+      className={shouldPrioritizeShuffle ? "" : "primary-inline-button"}
       disabled={startingNextMatch !== null}
       onClick={onStartNextMatch}
     >
