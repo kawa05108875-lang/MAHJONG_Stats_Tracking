@@ -11,6 +11,7 @@ import {
   joinGroup,
   type GroupSummary,
 } from "@/lib/firestore/groups";
+import type { AbortiveDrawType } from "@/types";
 
 type GroupDashboardProps = {
   user: User;
@@ -26,10 +27,25 @@ const VIEW_LABELS: Array<{ key: Exclude<DashboardView, "groups">; label: string 
   { key: "rules", label: "ルール" },
 ];
 
+const ABORTIVE_DRAW_LABELS: Array<{ key: AbortiveDrawType; label: string }> = [
+  { key: "nineTerminals", label: "九種九牌" },
+  { key: "fourWinds", label: "四風連打" },
+  { key: "fourRiichi", label: "四家立直" },
+  { key: "fourKan", label: "四カン流れ" },
+];
+
 function formatUma(group: GroupSummary) {
   const { first, second, third, fourth } = group.defaultRule.uma;
 
   return `${first >= 0 ? "+" : ""}${first} / ${second >= 0 ? "+" : ""}${second} / ${third} / ${fourth}`;
+}
+
+function formatAbortiveDrawRules(group: GroupSummary) {
+  const enabledRules = ABORTIVE_DRAW_LABELS.filter(
+    (rule) => group.defaultRule.abortiveDrawEnabled?.[rule.key] ?? true,
+  ).map((rule) => rule.label);
+
+  return enabledRules.length > 0 ? enabledRules.join(" / ") : "なし";
 }
 
 export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
@@ -323,6 +339,10 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                       <strong>
                         {selectedGroup.defaultRule.agariYameEnabled ?? true ? "あり" : "なし"}
                       </strong>
+                    </div>
+                    <div className="metric">
+                      <span className="label">途中流局</span>
+                      <strong>{formatAbortiveDrawRules(selectedGroup)}</strong>
                     </div>
                   </div>
                 </>

@@ -9,6 +9,8 @@ import {
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
 import type {
+  AbortiveDrawProgression,
+  AbortiveDrawType,
   Hand,
   HandType,
   MatchFinalResult,
@@ -27,6 +29,8 @@ export type HandSummary = Pick<
   | "riichiSticksBefore"
   | "handType"
   | "winType"
+  | "abortiveDrawType"
+  | "abortiveDrawProgression"
   | "riichiPlayerIds"
   | "winnerPlayerId"
   | "loserPlayerId"
@@ -43,6 +47,8 @@ export type CreateHandInput = {
   riichiSticksBefore: number;
   handType: HandType;
   winType?: WinType;
+  abortiveDrawType?: AbortiveDrawType;
+  abortiveDrawProgression?: AbortiveDrawProgression;
   riichiPlayerIds: string[];
   winnerPlayerId?: string;
   loserPlayerId?: string;
@@ -111,6 +117,8 @@ export async function getMatchHands(groupId: string, matchId: string): Promise<H
         riichiSticksBefore: hand.riichiSticksBefore,
         handType: hand.handType,
         winType: hand.winType,
+        abortiveDrawType: hand.abortiveDrawType,
+        abortiveDrawProgression: hand.abortiveDrawProgression,
         riichiPlayerIds: hand.riichiPlayerIds,
         winnerPlayerId: hand.winnerPlayerId,
         loserPlayerId: hand.loserPlayerId,
@@ -143,6 +151,10 @@ export async function createHandAndAdvanceMatch(input: CreateHandInput) {
     createdAt: now,
     updatedAt: now,
     ...(input.winType ? { winType: input.winType } : {}),
+    ...(input.abortiveDrawType ? { abortiveDrawType: input.abortiveDrawType } : {}),
+    ...(input.abortiveDrawProgression
+      ? { abortiveDrawProgression: input.abortiveDrawProgression }
+      : {}),
     ...(input.winnerPlayerId ? { winnerPlayerId: input.winnerPlayerId } : {}),
     ...(input.loserPlayerId ? { loserPlayerId: input.loserPlayerId } : {}),
     ...(input.tenpaiPlayerIds ? { tenpaiPlayerIds: input.tenpaiPlayerIds } : {}),

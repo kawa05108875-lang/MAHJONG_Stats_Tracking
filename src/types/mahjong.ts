@@ -24,9 +24,19 @@ export type MatchRound = {
 
 export type MatchStatus = "inputting" | "finished" | "cancelled";
 
-export type HandType = "win" | "draw" | "penalty";
+export type HandType = "win" | "draw" | "abortive-draw" | "penalty";
 
 export type WinType = "tsumo" | "ron";
+
+export type AbortiveDrawType =
+  | "nineTerminals"
+  | "fourWinds"
+  | "fourRiichi"
+  | "fourKan";
+
+export type AbortiveDrawProgression = "repeat" | "advance";
+
+export type AbortiveDrawRule = Record<AbortiveDrawType, boolean>;
 
 export type TieBreakRule = "dealer-near";
 
@@ -51,6 +61,7 @@ export type MatchRule = {
   dealerRepeatRule?: DealerRepeatRule;
   agariYameEnabled?: boolean;
   westRoundEnabled?: boolean;
+  abortiveDrawEnabled?: AbortiveDrawRule;
 };
 
 export type Group = {
@@ -130,6 +141,8 @@ export type Hand = {
   riichiSticksBefore: number;
   handType: HandType;
   winType?: WinType;
+  abortiveDrawType?: AbortiveDrawType;
+  abortiveDrawProgression?: AbortiveDrawProgression;
   riichiPlayerIds: string[];
   winnerPlayerId?: string;
   loserPlayerId?: string;
@@ -184,4 +197,10 @@ export const DEFAULT_MATCH_RULE: MatchRule = {
   dealerRepeatRule: "dealer-win-or-tenpai",
   agariYameEnabled: true,
   westRoundEnabled: false,
+  abortiveDrawEnabled: {
+    nineTerminals: true,
+    fourWinds: true,
+    fourRiichi: true,
+    fourKan: true,
+  },
 };

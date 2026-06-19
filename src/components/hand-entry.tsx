@@ -16,7 +16,15 @@ import {
   hasBankruptPlayer,
 } from "@/lib/mahjong";
 import { recalculateGroupPlayerStats } from "@/lib/firestore/stats";
-import type { HandType, MatchFinalResult, MatchRound, ScoreDelta, WinType } from "@/types";
+import type {
+  AbortiveDrawProgression,
+  AbortiveDrawType,
+  HandType,
+  MatchFinalResult,
+  MatchRound,
+  ScoreDelta,
+  WinType,
+} from "@/types";
 
 type HandEntryProps = {
   match: MatchSummary;
@@ -35,6 +43,19 @@ function notifyStatsChanged(groupId: string) {
 const HOUSE_LABELS = ["東", "南", "西", "北"] as const;
 const RON_HONBA_BONUS = 300;
 const TSUMO_HONBA_BONUS = 100;
+const ABORTIVE_DRAW_OPTIONS: Array<{ key: AbortiveDrawType; label: string }> = [
+  { key: "nineTerminals", label: "九種九牌" },
+  { key: "fourWinds", label: "四風連打" },
+  { key: "fourRiichi", label: "四家立直" },
+  { key: "fourKan", label: "四カン流れ" },
+];
+const ABORTIVE_DRAW_PROGRESSION_OPTIONS: Array<{
+  key: AbortiveDrawProgression;
+  label: string;
+}> = [
+  { key: "repeat", label: "同じ局で本場+1" },
+  { key: "advance", label: "次の局で本場+1" },
+];
 
 function parseScore(value: string) {
   const parsed = Number(value);
@@ -85,6 +106,16 @@ function calculateDrawScoreDeltas(
       delta: notenPenaltyDelta + riichiDelta,
     };
   });
+}
+
+function calculateAbortiveDrawScoreDeltas(
+  match: MatchSummary,
+  riichiPlayerIds: string[],
+) {
+  return match.players.map((player) => ({
+    playerId: player.playerId,
+    delta: riichiPlayerIds.includes(player.playerId) ? -1000 : 0,
+  }));
 }
 
 function getRoundIndex(match: MatchSummary) {
@@ -266,8 +297,20 @@ function getNextHandProgression(params: {
   handType: HandType;
   winnerPlayerId: string;
   tenpaiPlayerIds: string[];
+  abortiveDrawProgression: AbortiveDrawProgression;
 }) {
   const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
+
+  if (params.handType === "abortive-draw") {
+    return {
+      nextRound:
+        params.abortiveDrawProgression === "advance"
+          ? getNextRound(params.match.currentRound)
+          : params.match.currentRound,
+      nextHonba: params.match.currentHonba + 1,
+    };
+  }
+
   const dealerRepeatRule =
     params.match.rule.dealerRepeatRule ?? "dealer-win-or-tenpai";
   const dealerWon =
@@ -294,9 +337,24 @@ function getNextHandProgression(params: {
   };
 }
 
-function handTypeLabel(handType: HandType, winType?: WinType) {
+function abortiveDrawLabel(abortiveDrawType: AbortiveDrawType | undefined) {
+  return (
+    ABORTIVE_DRAW_OPTIONS.find((option) => option.key === abortiveDrawType)?.label ??
+    "途中流局"
+  );
+}
+
+function handTypeLabel(
+  handType: HandType,
+  winType?: WinType,
+  abortiveDrawType?: AbortiveDrawType,
+) {
   if (handType === "win") {
     return winType === "tsumo" ? "ツモ" : "ロン";
+  }
+
+  if (handType === "abortive-draw") {
+    return abortiveDrawLabel(abortiveDrawType);
   }
 
   if (handType === "draw") {
@@ -306,11 +364,24 @@ function handTypeLabel(handType: HandType, winType?: WinType) {
   return "罰符";
 }
 
+function abortiveDrawProgressionLabel(
+  abortiveDrawProgression: AbortiveDrawProgression | undefined,
+) {
+  return (
+    ABORTIVE_DRAW_PROGRESSION_OPTIONS.find(
+      (option) => option.key === abortiveDrawProgression,
+    )?.label ?? "同じ局で本場+1"
+  );
+}
+
 export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const [hands, setHands] = useState<HandSummary[]>([]);
   const [handTypeSelected, setHandTypeSelected] = useState(false);
   const [handType, setHandType] = useState<HandType>("win");
   const [winType, setWinType] = useState<WinType>("ron");
+  const [abortiveDrawType, setAbortiveDrawType] = useState<AbortiveDrawType | "">("");
+  const [abortiveDrawProgression, setAbortiveDrawProgression] =
+    useState<AbortiveDrawProgression>("repeat");
   const [winnerPlayerId, setWinnerPlayerId] = useState("");
   const [loserPlayerId, setLoserPlayerId] = useState("");
   const [ronPoint, setRonPoint] = useState("");
@@ -346,6 +417,10 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         return calculateDrawScoreDeltas(match, tenpaiPlayerIds, riichiPlayerIds);
       }
 
+      if (handType === "abortive-draw") {
+        return calculateAbortiveDrawScoreDeltas(match, riichiPlayerIds);
+      }
+
       return match.players.map((player) => ({
         playerId: player.playerId,
         delta: parseScore(scoreInputs[player.playerId] ?? "0"),
@@ -372,11 +447,22 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const expectedScoreDeltaTotal =
     handType === "win" ? match.currentRiichiSticks * 1000 : 0;
   const scoreDeltaTotalIsValid =
-    handType === "draw" || scoreDeltaTotal === expectedScoreDeltaTotal;
+    handType === "draw" ||
+    handType === "abortive-draw" ||
+    scoreDeltaTotal === expectedScoreDeltaTotal;
   const nextRiichiSticks =
-    handType === "draw" ? match.currentRiichiSticks + riichiPlayerIds.length : 0;
+    handType === "draw" || handType === "abortive-draw"
+      ? match.currentRiichiSticks + riichiPlayerIds.length
+      : 0;
   const currentDealerPlayerId = getCurrentDealerPlayerId(match);
   const currentSeatPlayers = useMemo(() => getCurrentSeatPlayers(match), [match]);
+  const enabledAbortiveDrawOptions = useMemo(
+    () =>
+      ABORTIVE_DRAW_OPTIONS.filter(
+        (option) => match.rule.abortiveDrawEnabled?.[option.key] ?? true,
+      ),
+    [match.rule.abortiveDrawEnabled],
+  );
   const winnerIsDealer = winnerPlayerId === currentDealerPlayerId;
   const currentScores = useMemo(
     () => calculateCurrentScores(match.players, hands, match.rule.initialScore),
@@ -437,6 +523,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setHandTypeSelected(false);
     setHandType("win");
     setWinType("ron");
+    setAbortiveDrawType("");
+    setAbortiveDrawProgression("repeat");
     setScoreInputs(createEmptyScoreInputs(match));
     setWinnerPlayerId("");
     setLoserPlayerId("");
@@ -449,9 +537,17 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   }
 
   function selectHandType(type: HandType) {
+    const nextAbortiveDrawType =
+      type === "abortive-draw" ? enabledAbortiveDrawOptions[0]?.key ?? "" : "";
+
     setHandType(type);
     setHandTypeSelected(true);
     setError(null);
+    setAbortiveDrawType(nextAbortiveDrawType);
+    setAbortiveDrawProgression("repeat");
+    if (nextAbortiveDrawType === "fourRiichi") {
+      setRiichiPlayerIds(currentSeatPlayers.map((player) => player.playerId));
+    }
     setDrawRiichiSticksConfirmed(false);
   }
 
@@ -460,6 +556,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setError(null);
     setWinnerPlayerId("");
     setLoserPlayerId("");
+    setAbortiveDrawType("");
+    setAbortiveDrawProgression("repeat");
     setRonPoint("");
     setDealerTsumoPoint("");
     setChildTsumoPoint("");
@@ -517,6 +615,16 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       return;
     }
 
+    if (handType === "abortive-draw" && !abortiveDrawType) {
+      setError("途中流局の種類を選択してください。");
+      return;
+    }
+
+    if (handType === "abortive-draw" && abortiveDrawType === "fourRiichi" && riichiPlayerIds.length !== 4) {
+      setError("四家立直は4人全員をリーチ者にしてください。");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -526,6 +634,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         handType,
         winnerPlayerId,
         tenpaiPlayerIds,
+        abortiveDrawProgression,
       });
       const nextScores = applyScoreDeltas(currentScores, scoreDeltas);
       const calculatedFinalResults = calculateMatchFinalResults(
@@ -538,17 +647,17 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         match.rule.bankruptcyEnabled && hasBankruptPlayer(nextScores)
           ? calculatedFinalResults
           : undefined;
-      const finalResultsByRule =
-        finalResultsByBankruptcy ??
-        (shouldFinishAfterHand({
+      const shouldFinishByRule =
+        handType !== "abortive-draw" &&
+        shouldFinishAfterHand({
           match,
           handType,
           winnerPlayerId,
           nextRound: nextProgression.nextRound,
           finalResults: calculatedFinalResults,
-        })
-          ? calculatedFinalResults
-          : undefined);
+        });
+      const finalResultsByRule =
+        finalResultsByBankruptcy ?? (shouldFinishByRule ? calculatedFinalResults : undefined);
 
       await createHandAndAdvanceMatch({
         matchId: match.matchId,
@@ -558,6 +667,10 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         riichiSticksBefore: match.currentRiichiSticks,
         handType,
         winType: handType === "win" ? winType : undefined,
+        abortiveDrawType:
+          handType === "abortive-draw" && abortiveDrawType ? abortiveDrawType : undefined,
+        abortiveDrawProgression:
+          handType === "abortive-draw" ? abortiveDrawProgression : undefined,
         riichiPlayerIds,
         winnerPlayerId: handType === "win" ? winnerPlayerId : undefined,
         loserPlayerId: handType === "win" && winType === "ron" ? loserPlayerId : undefined,
@@ -643,13 +756,20 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       <form className="match-form" onSubmit={handleSubmit}>
         {!handTypeSelected ? (
           <div className="segmented-control">
-            {(["win", "draw", "penalty"] as const).map((type) => (
+            {(["win", "draw", "abortive-draw", "penalty"] as const).map((type) => (
               <button
                 key={type}
                 type="button"
+                disabled={type === "abortive-draw" && enabledAbortiveDrawOptions.length === 0}
                 onClick={() => selectHandType(type)}
               >
-                {type === "win" ? "和了" : type === "draw" ? "流局" : "罰符"}
+                {type === "win"
+                  ? "和了"
+                  : type === "draw"
+                    ? "流局"
+                    : type === "abortive-draw"
+                      ? "途中流局"
+                      : "罰符"}
               </button>
             ))}
           </div>
@@ -658,7 +778,15 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             <div className="section-header">
               <div>
                 <p className="eyebrow">Hand Type</p>
-                <h4>{handType === "win" ? "和了" : handType === "draw" ? "流局" : "罰符"}</h4>
+                <h4>
+                  {handType === "win"
+                    ? "和了"
+                    : handType === "draw"
+                      ? "流局"
+                      : handType === "abortive-draw"
+                        ? "途中流局"
+                        : "罰符"}
+                </h4>
               </div>
               <button type="button" onClick={changeHandType}>
                 戻る
@@ -796,6 +924,46 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               </div>
             ) : null}
 
+            {handType === "abortive-draw" ? (
+              <>
+                <label className="select-field">
+                  <span>途中流局の種類</span>
+                  <select
+                    value={abortiveDrawType}
+                    onChange={(event) => {
+                      const nextType = event.target.value as AbortiveDrawType;
+                      setAbortiveDrawType(nextType);
+                      if (nextType === "fourRiichi") {
+                        setRiichiPlayerIds(currentSeatPlayers.map((player) => player.playerId));
+                      }
+                    }}
+                  >
+                    {enabledAbortiveDrawOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div>
+                  <p className="label">局の進行</p>
+                  <div className="segmented-control compact">
+                    {ABORTIVE_DRAW_PROGRESSION_OPTIONS.map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        className={abortiveDrawProgression === option.key ? "is-active" : ""}
+                        onClick={() => setAbortiveDrawProgression(option.key)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : null}
+
             <div className="check-list">
               <span className="label">リーチ者</span>
               {currentSeatPlayers.map((player) => (
@@ -839,6 +1007,13 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               </div>
             ) : null}
 
+            {handType === "abortive-draw" ? (
+              <p className="notice-text">
+                点数移動なしで{abortiveDrawProgressionLabel(abortiveDrawProgression)}
+                にします。リーチ者がいれば供託に入ります。
+              </p>
+            ) : null}
+
             <div className="score-input-grid">
               {currentSeatPlayers.map((player) => (
                 <label key={player.playerId}>
@@ -848,7 +1023,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                   <input
                     inputMode="numeric"
                     value={
-                      handType === "win" || handType === "draw"
+                      handType === "win" ||
+                      handType === "draw" ||
+                      handType === "abortive-draw"
                         ? String(
                             scoreDeltas.find(
                               (scoreDelta) => scoreDelta.playerId === player.playerId,
@@ -856,7 +1033,11 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                           )
                         : scoreInputs[player.playerId] ?? "0"
                     }
-                    readOnly={handType === "win" || handType === "draw"}
+                    readOnly={
+                      handType === "win" ||
+                      handType === "draw" ||
+                      handType === "abortive-draw"
+                    }
                     onChange={(event) =>
                       setScoreInputs((current) => ({
                         ...current,
@@ -878,6 +1059,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 : ""}
               {handType === "draw"
                 ? " / ノーテン罰符とリーチ棒を自動計算しています"
+                : ""}
+              {handType === "abortive-draw"
+                ? " / 途中流局はリーチ棒だけ供託に入ります"
                 : ""}
             </p>
 
@@ -931,14 +1115,16 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             <div>
               <strong>
                 {formatRound(hand.round)} {hand.honba}本場 /{" "}
-                {handTypeLabel(hand.handType, hand.winType)}
+                {handTypeLabel(hand.handType, hand.winType, hand.abortiveDrawType)}
               </strong>
               <span className="muted">
                 {hand.handType === "win"
                   ? `和了: ${playerName(match, hand.winnerPlayerId)} / 放銃: ${playerName(match, hand.loserPlayerId)}`
                   : hand.handType === "draw"
                     ? `聴牌: ${(hand.tenpaiPlayerIds ?? []).map((playerId) => playerName(match, playerId)).join(" / ") || "-"}`
-                    : "罰符"}
+                    : hand.handType === "abortive-draw"
+                      ? abortiveDrawProgressionLabel(hand.abortiveDrawProgression)
+                      : "罰符"}
               </span>
             </div>
           </div>

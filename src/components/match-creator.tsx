@@ -12,6 +12,7 @@ import { deleteMatchData } from "@/lib/firestore/maintenance";
 import { getGroupPlayers, type PlayerSummary } from "@/lib/firestore/players";
 import type { GroupSummary } from "@/lib/firestore/groups";
 import type {
+  AbortiveDrawType,
   DealerRepeatRule,
   MatchFinalResult,
   MatchPlayer,
@@ -28,6 +29,12 @@ type MatchView = "list" | "create" | "entry";
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
 const DEFAULT_DEALER_REPEAT_RULE: DealerRepeatRule = "dealer-win-or-tenpai";
+const ABORTIVE_DRAW_OPTIONS: Array<{ key: AbortiveDrawType; label: string }> = [
+  { key: "nineTerminals", label: "九種九牌" },
+  { key: "fourWinds", label: "四風連打" },
+  { key: "fourRiichi", label: "四家立直" },
+  { key: "fourKan", label: "四カン流れ" },
+];
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -51,6 +58,12 @@ function createRuleForm(rule: MatchRule) {
     dealerRepeatRule: rule.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
     agariYameEnabled: rule.agariYameEnabled ?? true,
     westRoundEnabled: rule.westRoundEnabled ?? false,
+    abortiveDrawEnabled: {
+      nineTerminals: rule.abortiveDrawEnabled?.nineTerminals ?? true,
+      fourWinds: rule.abortiveDrawEnabled?.fourWinds ?? true,
+      fourRiichi: rule.abortiveDrawEnabled?.fourRiichi ?? true,
+      fourKan: rule.abortiveDrawEnabled?.fourKan ?? true,
+    },
   };
 }
 
@@ -230,7 +243,18 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       dealerRepeatRule: ruleForm.dealerRepeatRule ?? DEFAULT_DEALER_REPEAT_RULE,
       agariYameEnabled: ruleForm.agariYameEnabled,
       westRoundEnabled: ruleForm.westRoundEnabled,
+      abortiveDrawEnabled: ruleForm.abortiveDrawEnabled,
     };
+  }
+
+  function updateAbortiveDrawRule(key: AbortiveDrawType, enabled: boolean) {
+    setRuleForm((current) => ({
+      ...current,
+      abortiveDrawEnabled: {
+        ...current.abortiveDrawEnabled,
+        [key]: enabled,
+      },
+    }));
   }
 
   async function handleCreateMatch(event: FormEvent<HTMLFormElement>) {
@@ -554,6 +578,20 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             <option value="disabled">なし: 親が和了したら連荘</option>
           </select>
         </label>
+
+        <div className="check-list">
+          <span className="label">途中流局</span>
+          {ABORTIVE_DRAW_OPTIONS.map((option) => (
+            <label key={option.key} className="check-row">
+              <input
+                type="checkbox"
+                checked={ruleForm.abortiveDrawEnabled[option.key]}
+                onChange={(event) => updateAbortiveDrawRule(option.key, event.target.checked)}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
 
         <button type="submit" className="primary-button" disabled={saving || !canCreateMatch}>
           半荘を開始
