@@ -459,16 +459,16 @@ select:focus {
 
 .player-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .player-row {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 10px;
-  min-height: 58px;
-  padding: 10px 12px;
+  gap: 8px;
+  min-height: 46px;
+  padding: 7px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -477,13 +477,30 @@ select:focus {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+}
+
+.player-main strong {
+  line-height: 1.25;
 }
 
 .row-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.player-actions {
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.player-actions button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.2;
 }
 
 .danger-button {
@@ -513,12 +530,12 @@ select:focus {
 .status-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
-  padding: 0 8px;
+  min-height: 22px;
+  padding: 0 6px;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
@@ -801,6 +818,13 @@ select:focus {
   .row-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .player-actions {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .hand-scoreboard {

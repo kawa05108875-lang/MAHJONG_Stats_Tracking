@@ -329,7 +329,7 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
                       : "手入力プレイヤー"}
                   </span>
                 </div>
-                <div className="row-actions">
+                <div className="row-actions player-actions">
                   {!linkedPlayerId && !player.linkedUid ? (
                     <button
                       type="button"
