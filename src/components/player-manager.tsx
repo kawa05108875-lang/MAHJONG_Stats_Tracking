@@ -200,9 +200,6 @@ export function PlayerManager({ groupId, user }: PlayerManagerProps) {
           <p className="eyebrow">Players</p>
           <h3>メンバー管理</h3>
         </div>
-        <button type="button" onClick={loadPlayers} disabled={loading}>
-          更新
-        </button>
       </div>
 
       <form className="form-grid" onSubmit={handleCreatePlayer}>

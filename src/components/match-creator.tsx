@@ -304,18 +304,13 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         </div>
         <div className="row-actions">
           {matchView === "list" ? (
-            <>
-              <button type="button" onClick={loadData} disabled={loading}>
-                更新
-              </button>
-              <button
-                type="button"
-                className="primary-inline-button"
-                onClick={() => setMatchView("create")}
-              >
-                新規半荘
-              </button>
-            </>
+            <button
+              type="button"
+              className="primary-inline-button"
+              onClick={() => setMatchView("create")}
+            >
+              新規半荘
+            </button>
           ) : (
             <button type="button" onClick={returnToList}>
               半荘一覧へ

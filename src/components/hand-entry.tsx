@@ -1076,9 +1076,6 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           <p className="eyebrow">Current Scores</p>
           <h4>現在点</h4>
         </div>
-        <button type="button" onClick={handleFinishMatch} disabled={finishing || loading}>
-          {finishing ? "保存中..." : "半荘を終了"}
-        </button>
       </div>
 
       <div className="score-grid hand-scoreboard">
@@ -1131,6 +1128,15 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           </div>
         ))}
       </div>
+
+      <button
+        type="button"
+        className="primary-button"
+        onClick={handleFinishMatch}
+        disabled={finishing || loading}
+      >
+        {finishing ? "保存中..." : "半荘を終了"}
+      </button>
     </section>
   );
 }
