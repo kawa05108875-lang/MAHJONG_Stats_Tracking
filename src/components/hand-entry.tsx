@@ -8,6 +8,8 @@ import {
   getMatchHands,
   getNextRound,
   type HandSummary,
+  type RecalculatedHandInput,
+  updateHandsAndMatchAfterEdit,
 } from "@/lib/firestore/hands";
 import { finishMatch, type MatchSummary } from "@/lib/firestore/matches";
 import {
@@ -86,6 +88,16 @@ function applyScoreDeltas(
       [scoreDelta.playerId]: (scores[scoreDelta.playerId] ?? 0) + scoreDelta.delta,
     }),
     { ...currentScores },
+  );
+}
+
+function scoreDeltaMap(scoreDeltas: ScoreDelta[]) {
+  return scoreDeltas.reduce<Record<string, number>>(
+    (map, scoreDelta) => ({
+      ...map,
+      [scoreDelta.playerId]: scoreDelta.delta,
+    }),
+    {},
   );
 }
 
@@ -440,10 +452,28 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     createEmptyScoreInputs(match),
   );
   const [drawRiichiSticksConfirmed, setDrawRiichiSticksConfirmed] = useState(false);
+  const [editingHandId, setEditingHandId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const editingHandIndex = editingHandId
+    ? hands.findIndex((hand) => hand.handId === editingHandId)
+    : -1;
+  const editingHand = editingHandIndex >= 0 ? hands[editingHandIndex] : null;
+  const calculationHands = editingHand ? hands.slice(0, editingHandIndex) : hands;
+  const entryMatch = useMemo(
+    () =>
+      editingHand
+        ? {
+            ...match,
+            currentRound: editingHand.round,
+            currentHonba: editingHand.honba,
+            currentRiichiSticks: editingHand.riichiSticksBefore,
+          }
+        : match,
+    [editingHand, match],
+  );
   const effectiveWinnerPlayerIds = useMemo(
     () =>
       handType === "win" && winType === "ron" && ronWinnerCount > 1
@@ -479,7 +509,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     () => {
       if (handType === "win") {
         return calculateWinScoreDeltas({
-          match,
+          match: entryMatch,
           winType,
           winnerPlayerIds: effectiveWinnerPlayerIds,
           loserPlayerId,
@@ -491,14 +521,14 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       }
 
       if (handType === "draw") {
-        return calculateDrawScoreDeltas(match, drawTenpaiPlayerIds, riichiPlayerIds);
+        return calculateDrawScoreDeltas(entryMatch, drawTenpaiPlayerIds, riichiPlayerIds);
       }
 
       if (handType === "abortive-draw") {
-        return calculateAbortiveDrawScoreDeltas(match, riichiPlayerIds);
+        return calculateAbortiveDrawScoreDeltas(entryMatch, riichiPlayerIds);
       }
 
-      return match.players.map((player) => ({
+      return entryMatch.players.map((player) => ({
         playerId: player.playerId,
         delta: parseScore(scoreInputs[player.playerId] ?? "0"),
       }));
@@ -506,9 +536,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     [
       childTsumoPoint,
       dealerTsumoPoint,
+      entryMatch,
       handType,
       loserPlayerId,
-      match,
       effectiveWinnerPlayerIds,
       riichiPlayerIds,
       ronPointsByWinner,
@@ -522,28 +552,28 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     0,
   );
   const expectedScoreDeltaTotal =
-    handType === "win" ? match.currentRiichiSticks * 1000 : 0;
+    handType === "win" ? entryMatch.currentRiichiSticks * 1000 : 0;
   const scoreDeltaTotalIsValid =
     handType === "draw" ||
     handType === "abortive-draw" ||
     scoreDeltaTotal === expectedScoreDeltaTotal;
   const nextRiichiSticks =
     handType === "draw" || handType === "abortive-draw"
-      ? match.currentRiichiSticks + riichiPlayerIds.length
+      ? entryMatch.currentRiichiSticks + riichiPlayerIds.length
       : 0;
-  const currentDealerPlayerId = getCurrentDealerPlayerId(match);
-  const currentSeatPlayers = useMemo(() => getCurrentSeatPlayers(match), [match]);
+  const currentDealerPlayerId = getCurrentDealerPlayerId(entryMatch);
+  const currentSeatPlayers = useMemo(() => getCurrentSeatPlayers(entryMatch), [entryMatch]);
   const enabledAbortiveDrawOptions = useMemo(
     () =>
       ABORTIVE_DRAW_OPTIONS.filter(
-        (option) => match.rule.abortiveDrawEnabled?.[option.key] ?? true,
+        (option) => entryMatch.rule.abortiveDrawEnabled?.[option.key] ?? true,
       ),
-    [match.rule.abortiveDrawEnabled],
+    [entryMatch.rule.abortiveDrawEnabled],
   );
   const winnerIsDealer = effectiveWinnerPlayerIds[0] === currentDealerPlayerId;
   const currentScores = useMemo(
-    () => calculateCurrentScores(match.players, hands, match.rule.initialScore),
-    [hands, match.players, match.rule.initialScore],
+    () => calculateCurrentScores(entryMatch.players, calculationHands, entryMatch.rule.initialScore),
+    [calculationHands, entryMatch.players, entryMatch.rule.initialScore],
   );
   const finalResults = useMemo(
     () =>
@@ -627,6 +657,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setRiichiPlayerIds([]);
     setTenpaiPlayerIds([]);
     setDrawRiichiSticksConfirmed(false);
+    setEditingHandId(null);
   }
 
   function selectHandType(type: HandType) {
@@ -660,6 +691,104 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setChildTsumoPoint("");
     setTenpaiPlayerIds([]);
     setDrawRiichiSticksConfirmed(false);
+  }
+
+  function startEditingHand(hand: HandSummary) {
+    const editingMatch = {
+      ...match,
+      currentRound: hand.round,
+      currentHonba: hand.honba,
+      currentRiichiSticks: hand.riichiSticksBefore,
+    };
+    const deltas = scoreDeltaMap(hand.scoreDeltas);
+    const winners = hand.winnerPlayerIds ?? (hand.winnerPlayerId ? [hand.winnerPlayerId] : []);
+    const adjustedDelta = (playerId: string) =>
+      (deltas[playerId] ?? 0) + (hand.riichiPlayerIds.includes(playerId) ? 1000 : 0);
+
+    setEditingHandId(hand.handId);
+    setHandTypeSelected(true);
+    setHandType(hand.handType);
+    setWinType(hand.winType ?? "ron");
+    setAbortiveDrawType(hand.abortiveDrawType ?? "");
+    setAbortiveDrawProgression(hand.abortiveDrawProgression ?? "repeat");
+    setRiichiPlayerIds(hand.riichiPlayerIds);
+    setTenpaiPlayerIds(hand.tenpaiPlayerIds ?? []);
+    setWinnerPlayerId(winners[0] ?? "");
+    setWinnerPlayerIds(winners);
+    setLoserPlayerId(hand.loserPlayerId ?? "");
+    setScoreInputs(
+      Object.fromEntries(
+        match.players.map((player) => [player.playerId, String(deltas[player.playerId] ?? 0)]),
+      ),
+    );
+    setDrawRiichiSticksConfirmed(hand.handType === "draw");
+    setError(null);
+
+    if (hand.handType !== "win") {
+      setRonWinnerCount(1);
+      setRonPoint("");
+      setRonPointInputs({});
+      setDealerTsumoPoint("");
+      setChildTsumoPoint("");
+      return;
+    }
+
+    if (hand.winType === "ron") {
+      const nextRonWinnerCount = Math.min(Math.max(winners.length, 1), 3) as RonWinnerCount;
+      const upperWinnerPlayerId =
+        hand.loserPlayerId && winners.length > 1
+          ? getUpperRonWinnerPlayerId(editingMatch, hand.loserPlayerId, winners)
+          : winners[0];
+      const riichiStickPoint = (hand.riichiSticksBefore + hand.riichiPlayerIds.length) * 1000;
+      const pointInputs = Object.fromEntries(
+        winners.map((playerId) => {
+          const point =
+            adjustedDelta(playerId) -
+            hand.honba * RON_HONBA_BONUS -
+            (playerId === upperWinnerPlayerId ? riichiStickPoint : 0);
+
+          return [playerId, String(Math.max(point, 0))];
+        }),
+      );
+
+      setRonWinnerCount(nextRonWinnerCount);
+      setRonPoint(pointInputs[winners[0]] ?? "");
+      setRonPointInputs(pointInputs);
+      setDealerTsumoPoint("");
+      setChildTsumoPoint("");
+      return;
+    }
+
+    const currentDealerId = getCurrentDealerPlayerId(editingMatch);
+    const winnerId = winners[0];
+    const loserPlayers = match.players.filter((player) => player.playerId !== winnerId);
+
+    setRonWinnerCount(1);
+    setRonPoint("");
+    setRonPointInputs({});
+
+    if (winnerId === currentDealerId) {
+      const payer = loserPlayers[0];
+      const point = payer
+        ? -adjustedDelta(payer.playerId) - hand.honba * TSUMO_HONBA_BONUS
+        : 0;
+
+      setDealerTsumoPoint(String(Math.max(point, 0)));
+      setChildTsumoPoint("");
+      return;
+    }
+
+    const dealerPayer = loserPlayers.find((player) => player.playerId === currentDealerId);
+    const childPayer = loserPlayers.find((player) => player.playerId !== currentDealerId);
+    const dealerPoint = dealerPayer
+      ? -adjustedDelta(dealerPayer.playerId) - hand.honba * TSUMO_HONBA_BONUS
+      : 0;
+    const childPoint = childPayer
+      ? -adjustedDelta(childPayer.playerId) - hand.honba * TSUMO_HONBA_BONUS
+      : 0;
+
+    setDealerTsumoPoint(String(Math.max(dealerPoint, 0)));
+    setChildTsumoPoint(String(Math.max(childPoint, 0)));
   }
 
   function selectRonWinnerCount(count: RonWinnerCount) {
@@ -781,7 +910,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
 
     try {
       const nextProgression = getNextHandProgression({
-        match,
+        match: entryMatch,
         handType,
         winnerPlayerIds: effectiveWinnerPlayerIds,
         tenpaiPlayerIds: drawTenpaiPlayerIds,
@@ -804,7 +933,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       const shouldFinishByRule =
         handType !== "abortive-draw" &&
         shouldFinishAfterHand({
-          match,
+          match: entryMatch,
           handType,
           winnerPlayerIds: effectiveWinnerPlayerIds,
           nextRound: nextProgression.nextRound,
@@ -813,12 +942,12 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       const finalResultsByRule =
         finalResultsByBankruptcy ?? (shouldFinishByRule ? calculatedFinalResults : undefined);
 
-      await createHandAndAdvanceMatch({
+      const handInput = {
         matchId: match.matchId,
         groupId: match.groupId,
-        round: match.currentRound,
-        honba: match.currentHonba,
-        riichiSticksBefore: match.currentRiichiSticks,
+        round: entryMatch.currentRound,
+        honba: entryMatch.currentHonba,
+        riichiSticksBefore: entryMatch.currentRiichiSticks,
         handType,
         winType: handType === "win" ? winType : undefined,
         abortiveDrawType:
@@ -832,12 +961,37 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         tenpaiPlayerIds: handType === "draw" ? drawTenpaiPlayerIds : undefined,
         scoreDeltas,
         memo: null,
+      };
+
+      if (editingHand) {
+        if (editingHandIndex !== hands.length - 1) {
+          setError("修正できるのは直前の局だけです。");
+          return;
+        }
+
+        await updateHandsAndMatchAfterEdit({
+          matchId: match.matchId,
+          hands: [
+            {
+              ...handInput,
+              handId: editingHand.handId,
+            } satisfies RecalculatedHandInput,
+          ],
+          nextRound: nextProgression.nextRound,
+          nextHonba: nextProgression.nextHonba,
+          nextRiichiSticks,
+          uid: user.uid,
+        });
+      } else {
+        await createHandAndAdvanceMatch({
+          ...handInput,
         nextRound: nextProgression.nextRound,
         nextHonba: nextProgression.nextHonba,
         nextRiichiSticks,
         finalResults: finalResultsByRule,
         uid: user.uid,
-      });
+        });
+      }
 
       await recalculateGroupPlayerStats(match.groupId);
       notifyStatsChanged(match.groupId);
@@ -860,6 +1014,11 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   }
 
   async function handleFinishMatch() {
+    if (editingHand) {
+      setError("局結果の修正を保存またはキャンセルしてから半荘を終了してください。");
+      return;
+    }
+
     if (hands.length === 0) {
       setError("少なくとも1局は入力してから半荘を終了してください。");
       return;
@@ -898,10 +1057,22 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         <div>
           <p className="eyebrow">Hand Entry</p>
           <h3>
-            {formatRound(match.currentRound)} {match.currentHonba}本場
+            {formatRound(entryMatch.currentRound)} {entryMatch.currentHonba}本場
           </h3>
         </div>
       </div>
+
+      {editingHand ? (
+        <div className="notice">
+          <strong>直前の局を修正中</strong>
+          <span>
+            {formatRound(editingHand.round)} {editingHand.honba}本場の内容を修正しています。
+          </span>
+          <button type="button" className="compact-action-button" onClick={resetForm}>
+            修正をキャンセル
+          </button>
+        </div>
+      ) : null}
 
       <form className="match-form" onSubmit={handleSubmit}>
         {!handTypeSelected ? (
@@ -1006,7 +1177,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                         .filter((player) => player.playerId !== loserPlayerId)
                         .map((player) => (
                           <option key={player.playerId} value={player.playerId}>
-                            {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                            {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name}
                           </option>
                         ))}
                     </select>
@@ -1032,7 +1203,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                           .filter((player) => !effectiveWinnerPlayerIds.includes(player.playerId))
                           .map((player) => (
                             <option key={player.playerId} value={player.playerId}>
-                              {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                              {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name}
                             </option>
                           ))}
                       </select>
@@ -1066,7 +1237,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                                   onChange={() => toggleRonWinner(player.playerId)}
                                 />
                                 <span>
-                                  {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                                  {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name}
                                 </span>
                               </label>
                             );
@@ -1157,7 +1328,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                         }}
                       />
                       <span>
-                        {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                        {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name}
                         {isRiichiPlayer ? "（リーチ）" : ""}
                       </span>
                     </label>
@@ -1217,7 +1388,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                     onChange={() => toggleRiichiPlayerId(player.playerId)}
                   />
                   <span>
-                    {getCurrentHouseLabel(match, player.seatIndex)} {player.name}
+                    {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name}
                   </span>
                 </label>
               ))}
@@ -1228,10 +1399,10 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 <strong>流局精算確認</strong>
                 <span>
                   聴牌者 {drawTenpaiPlayerIds.length}人 / ノーテン{" "}
-                  {match.players.length - drawTenpaiPlayerIds.length}人
+                  {entryMatch.players.length - drawTenpaiPlayerIds.length}人
                 </span>
                 <span>
-                  現在供託 {match.currentRiichiSticks}本 + 今回リーチ{" "}
+                  現在供託 {entryMatch.currentRiichiSticks}本 + 今回リーチ{" "}
                   {riichiPlayerIds.length}本 = 次局供託 {nextRiichiSticks}本
                 </span>
                 <label className="check-row">
@@ -1258,7 +1429,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               {currentSeatPlayers.map((player) => (
                 <label key={player.playerId}>
                   <span>
-                    {getCurrentHouseLabel(match, player.seatIndex)} {player.name} 増減
+                    {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name} 増減
                   </span>
                   <input
                     inputMode="numeric"
@@ -1306,7 +1477,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             </p>
 
             <button type="submit" className="primary-button sticky-action" disabled={saving}>
-              局結果を保存
+              {saving ? "保存中..." : editingHand ? "修正を保存" : "局結果を保存"}
             </button>
           </>
         )}
@@ -1326,7 +1497,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             className={`metric ${player.playerId === currentDealerPlayerId ? "current-dealer" : ""}`}
           >
             <span className="seat-label">
-              {getCurrentHouseLabel(match, player.seatIndex)}
+              {getCurrentHouseLabel(entryMatch, player.seatIndex)}
               {player.playerId === currentDealerPlayerId ? " / 親" : ""}
             </span>
             <span className="label">{player.name}</span>
@@ -1335,9 +1506,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         ))}
       </div>
 
-      {match.currentRiichiSticks > 0 ? (
+      {entryMatch.currentRiichiSticks > 0 ? (
         <p className="notice-text">
-          供託が{match.currentRiichiSticks}本残っています。半荘終了時はトップに加算されます。
+          供託が{entryMatch.currentRiichiSticks}本残っています。半荘終了時はトップに加算されます。
         </p>
       ) : null}
 
@@ -1349,7 +1520,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         {!loading && hands.length === 0 ? (
           <p className="empty-state">まだ局結果がありません。</p>
         ) : null}
-        {hands.map((hand) => (
+        {hands.map((hand, index) => (
           <div key={hand.handId} className="match-row">
             <div>
               <strong>
@@ -1363,9 +1534,19 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                     ? `聴牌: ${(hand.tenpaiPlayerIds ?? []).map((playerId) => playerName(match, playerId)).join(" / ") || "-"}`
                     : hand.handType === "abortive-draw"
                       ? abortiveDrawProgressionLabel(hand.abortiveDrawProgression)
-                      : "罰符"}
+                  : "罰符"}
               </span>
             </div>
+            {index === hands.length - 1 ? (
+              <button
+                type="button"
+                className="compact-action-button"
+                onClick={() => startEditingHand(hand)}
+                disabled={saving || finishing || editingHandId === hand.handId}
+              >
+                {editingHandId === hand.handId ? "修正中" : "修正"}
+              </button>
+            ) : null}
           </div>
         ))}
       </div>

@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   getDocs,
   query,
@@ -38,6 +39,7 @@ export type HandSummary = Pick<
   | "tenpaiPlayerIds"
   | "scoreDeltas"
   | "memo"
+  | "createdAt"
 >;
 
 export type CreateHandInput = {
@@ -62,6 +64,13 @@ export type CreateHandInput = {
   nextRiichiSticks: number;
   finalResults?: MatchFinalResult[];
   uid: string;
+};
+
+export type RecalculatedHandInput = Omit<
+  CreateHandInput,
+  "finalResults" | "nextHonba" | "nextRiichiSticks" | "nextRound" | "uid"
+> & {
+  handId: string;
 };
 
 const ROUND_ORDER: MatchRound[] = [
@@ -128,8 +137,55 @@ export async function getMatchHands(groupId: string, matchId: string): Promise<H
         tenpaiPlayerIds: hand.tenpaiPlayerIds,
         scoreDeltas: hand.scoreDeltas,
         memo: hand.memo,
+        createdAt: hand.createdAt,
       } satisfies HandSummary;
+    })
+    .sort((left, right) => {
+      const leftSeconds = "seconds" in left.createdAt ? left.createdAt.seconds : 0;
+      const rightSeconds = "seconds" in right.createdAt ? right.createdAt.seconds : 0;
+
+      return leftSeconds - rightSeconds;
     });
+}
+
+function createMutableHandData(
+  input: CreateHandInput | RecalculatedHandInput,
+  options: { includeDeletedOptionalFields: boolean },
+) {
+  const data = {
+    round: input.round,
+    honba: input.honba,
+    riichiSticksBefore: input.riichiSticksBefore,
+    handType: input.handType,
+    riichiPlayerIds: input.riichiPlayerIds,
+    scoreDeltas: input.scoreDeltas,
+    memo: input.memo,
+  };
+
+  return {
+    ...data,
+    ...(input.winType || options.includeDeletedOptionalFields
+      ? { winType: input.winType ?? deleteField() }
+      : {}),
+    ...(input.abortiveDrawType || options.includeDeletedOptionalFields
+      ? { abortiveDrawType: input.abortiveDrawType ?? deleteField() }
+      : {}),
+    ...(input.abortiveDrawProgression || options.includeDeletedOptionalFields
+      ? { abortiveDrawProgression: input.abortiveDrawProgression ?? deleteField() }
+      : {}),
+    ...(input.winnerPlayerId || options.includeDeletedOptionalFields
+      ? { winnerPlayerId: input.winnerPlayerId ?? deleteField() }
+      : {}),
+    ...(input.winnerPlayerIds || options.includeDeletedOptionalFields
+      ? { winnerPlayerIds: input.winnerPlayerIds ?? deleteField() }
+      : {}),
+    ...(input.loserPlayerId || options.includeDeletedOptionalFields
+      ? { loserPlayerId: input.loserPlayerId ?? deleteField() }
+      : {}),
+    ...(input.tenpaiPlayerIds || options.includeDeletedOptionalFields
+      ? { tenpaiPlayerIds: input.tenpaiPlayerIds ?? deleteField() }
+      : {}),
+  };
 }
 
 export async function createHandAndAdvanceMatch(input: CreateHandInput) {
@@ -142,26 +198,11 @@ export async function createHandAndAdvanceMatch(input: CreateHandInput) {
     handId: handRef.id,
     matchId: input.matchId,
     groupId: input.groupId,
-    round: input.round,
-    honba: input.honba,
-    riichiSticksBefore: input.riichiSticksBefore,
-    handType: input.handType,
-    riichiPlayerIds: input.riichiPlayerIds,
-    scoreDeltas: input.scoreDeltas,
-    memo: input.memo,
+    ...createMutableHandData(input, { includeDeletedOptionalFields: false }),
     createdBy: input.uid,
     updatedBy: input.uid,
     createdAt: now,
     updatedAt: now,
-    ...(input.winType ? { winType: input.winType } : {}),
-    ...(input.abortiveDrawType ? { abortiveDrawType: input.abortiveDrawType } : {}),
-    ...(input.abortiveDrawProgression
-      ? { abortiveDrawProgression: input.abortiveDrawProgression }
-      : {}),
-    ...(input.winnerPlayerId ? { winnerPlayerId: input.winnerPlayerId } : {}),
-    ...(input.winnerPlayerIds ? { winnerPlayerIds: input.winnerPlayerIds } : {}),
-    ...(input.loserPlayerId ? { loserPlayerId: input.loserPlayerId } : {}),
-    ...(input.tenpaiPlayerIds ? { tenpaiPlayerIds: input.tenpaiPlayerIds } : {}),
   };
 
   batch.set(handRef, handData);
@@ -183,4 +224,38 @@ export async function createHandAndAdvanceMatch(input: CreateHandInput) {
   await batch.commit();
 
   return handRef.id;
+}
+
+export async function updateHandsAndMatchAfterEdit(input: {
+  matchId: string;
+  hands: RecalculatedHandInput[];
+  nextRound: MatchRound;
+  nextHonba: number;
+  nextRiichiSticks: number;
+  uid: string;
+}) {
+  const db = getFirebaseDb();
+  const matchRef = doc(db, "matches", input.matchId);
+  const now = serverTimestamp();
+  const batch = writeBatch(db);
+
+  for (const hand of input.hands) {
+    batch.update(doc(db, "hands", hand.handId), {
+      ...createMutableHandData(hand, { includeDeletedOptionalFields: true }),
+      updatedBy: input.uid,
+      updatedAt: now,
+    });
+  }
+
+  batch.update(matchRef, {
+    status: "inputting",
+    currentRound: input.nextRound,
+    currentHonba: input.nextHonba,
+    currentRiichiSticks: input.nextRiichiSticks,
+    finalResults: null,
+    updatedBy: input.uid,
+    updatedAt: now,
+  });
+
+  await batch.commit();
 }
