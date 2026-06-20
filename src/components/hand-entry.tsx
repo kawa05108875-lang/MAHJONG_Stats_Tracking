@@ -639,6 +639,24 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setDrawRiichiSticksConfirmed(false);
   }
 
+  function updateScoreInput(playerId: string, value: string) {
+    setScoreInputs((current) => ({
+      ...current,
+      [playerId]: value,
+    }));
+  }
+
+  function setPenaltyScoreSign(playerId: string, sign: "plus" | "minus") {
+    const currentValue = scoreInputs[playerId] ?? "0";
+    const unsignedValue = currentValue.replace(/^[+-]/, "");
+    const nextValue =
+      sign === "minus"
+        ? `-${unsignedValue === "0" ? "" : unsignedValue}`
+        : unsignedValue || "0";
+
+    updateScoreInput(playerId, nextValue);
+  }
+
   function resetForm() {
     setHandTypeSelected(false);
     setHandType("win");
@@ -1426,39 +1444,64 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             ) : null}
 
             <div className="score-input-grid">
-              {currentSeatPlayers.map((player) => (
-                <label key={player.playerId}>
-                  <span>
-                    {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name} 増減
-                  </span>
-                  <input
-                    inputMode={handType === "penalty" ? "decimal" : "numeric"}
-                    placeholder={handType === "penalty" ? "例: -1000" : undefined}
-                    value={
-                      handType === "win" ||
-                      handType === "draw" ||
-                      handType === "abortive-draw"
-                        ? String(
-                            scoreDeltas.find(
-                              (scoreDelta) => scoreDelta.playerId === player.playerId,
-                            )?.delta ?? 0,
-                          )
-                        : scoreInputs[player.playerId] ?? "0"
-                    }
-                    readOnly={
-                      handType === "win" ||
-                      handType === "draw" ||
-                      handType === "abortive-draw"
-                    }
-                    onChange={(event) =>
-                      setScoreInputs((current) => ({
-                        ...current,
-                        [player.playerId]: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-              ))}
+              {currentSeatPlayers.map((player) => {
+                const isEditablePenalty = handType === "penalty";
+                const scoreInputValue = scoreInputs[player.playerId] ?? "0";
+                const isNegative = scoreInputValue.startsWith("-");
+                const displayedScoreValue =
+                  handType === "win" ||
+                  handType === "draw" ||
+                  handType === "abortive-draw"
+                    ? String(
+                        scoreDeltas.find(
+                          (scoreDelta) => scoreDelta.playerId === player.playerId,
+                        )?.delta ?? 0,
+                      )
+                    : scoreInputValue;
+
+                return (
+                  <div key={player.playerId} className="score-input-field">
+                    <label>
+                      <span>
+                        {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name} 増減
+                      </span>
+                      <div className={isEditablePenalty ? "signed-score-input" : ""}>
+                        <input
+                          inputMode={isEditablePenalty ? "text" : "numeric"}
+                          placeholder={isEditablePenalty ? "例: -1000" : undefined}
+                          value={displayedScoreValue}
+                          readOnly={
+                            handType === "win" ||
+                            handType === "draw" ||
+                            handType === "abortive-draw"
+                          }
+                          onChange={(event) =>
+                            updateScoreInput(player.playerId, event.target.value)
+                          }
+                        />
+                        {isEditablePenalty ? (
+                          <>
+                            <button
+                              type="button"
+                              className={`compact-action-button ${!isNegative ? "is-active" : ""}`}
+                              onClick={() => setPenaltyScoreSign(player.playerId, "plus")}
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              className={`compact-action-button ${isNegative ? "is-active" : ""}`}
+                              onClick={() => setPenaltyScoreSign(player.playerId, "minus")}
+                            >
+                              -
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    </label>
+                  </div>
+                );
+              })}
             </div>
             <p
               className={
