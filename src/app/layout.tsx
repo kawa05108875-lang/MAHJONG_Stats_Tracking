@@ -3,8 +3,8 @@ import { AuthProvider } from "@/components/auth-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "麻雀成績管理",
-  description: "対局ごとの半荘とプレイヤー成績を管理する麻雀アプリ",
+  title: "ジャンログ",
+  description: "対局ごとの半荘とプレイヤー成績を記録する麻雀ログアプリ",
 };
 
 export default function RootLayout({

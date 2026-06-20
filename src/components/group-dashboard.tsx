@@ -344,9 +344,12 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   return (
     <main className="app-frame">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Mahjong Score Manager</p>
-          <h1>麻雀成績管理</h1>
+        <div className="brand-lockup compact">
+          <span className="brand-mark" aria-hidden="true">雀</span>
+          <div>
+            <p className="eyebrow">Mahjong Logbook</p>
+            <h1>ジャンログ</h1>
+          </div>
         </div>
         <div className="user-menu">
           <span>{user.displayName ?? user.email ?? "ログイン中"}</span>

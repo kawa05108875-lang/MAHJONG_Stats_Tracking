@@ -13,12 +13,17 @@ export default function Home() {
 
   return (
     <main className="app-shell">
-      <section className="panel">
+      <section className="panel brand-panel">
         <div className="stack">
-          <p className="eyebrow">Mahjong Score Manager</p>
-          <h1>麻雀成績管理</h1>
+          <div className="brand-lockup">
+            <span className="brand-mark" aria-hidden="true">雀</span>
+            <div>
+              <p className="eyebrow">Mahjong Logbook</p>
+              <h1>ジャンログ</h1>
+            </div>
+          </div>
           <p className="lead">
-            対局ごとの半荘、局結果、プレイヤー別成績を管理するための初期セットアップです。
+            半荘、局結果、プレイヤー別成績をすばやく残せる麻雀ログアプリです。
           </p>
 
           {!isFirebaseConfigured ? (
