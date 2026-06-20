@@ -35,6 +35,7 @@ type MatchBlockSummary = {
   matches: MatchSummary[];
   startedDate: string;
   finishedMatchCount: number;
+  inputtingMatchCount: number;
   playerTotals: MatchBlockPlayerTotal[];
 };
 type MatchBlockAssignment = {
@@ -244,11 +245,26 @@ function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[]
         }
       }
 
+      const inputtingMatchCount = sortedMatches.filter(
+        (match) => match.status === "inputting",
+      ).length;
+
       return {
         blockId,
-        matches: sortedMatches,
+        matches: [...sortedMatches].sort((left, right) => {
+          if (left.status === "inputting" && right.status !== "inputting") {
+            return -1;
+          }
+
+          if (left.status !== "inputting" && right.status === "inputting") {
+            return 1;
+          }
+
+          return sortedMatches.indexOf(left) - sortedMatches.indexOf(right);
+        }),
         startedDate: matchBlockStartedDate(sortedMatches[0]),
         finishedMatchCount: sortedMatches.filter((match) => match.status === "finished").length,
+        inputtingMatchCount,
         playerTotals: Array.from(playerTotals.values()).sort((left, right) => {
           const pointDiff = right.totalPoint - left.totalPoint;
 
@@ -261,6 +277,14 @@ function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[]
       };
     })
     .sort((left, right) => {
+      if (left.inputtingMatchCount > 0 && right.inputtingMatchCount === 0) {
+        return -1;
+      }
+
+      if (left.inputtingMatchCount === 0 && right.inputtingMatchCount > 0) {
+        return 1;
+      }
+
       const leftLatest = left.matches[left.matches.length - 1];
       const rightLatest = right.matches[right.matches.length - 1];
       const dateDiff = rightLatest.date.localeCompare(leftLatest.date);
@@ -403,6 +427,10 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     [matches, selectedMatchId],
   );
   const matchBlocks = useMemo(() => createMatchBlockSummaries(matches), [matches]);
+  const inputtingMatchCount = useMemo(
+    () => matches.filter((match) => match.status === "inputting").length,
+    [matches],
+  );
   const recentSamePlayerMatchCount = useMemo(
     () => countRecentRotatedMatches(matches, selectedMatch),
     [matches, selectedMatch],
@@ -800,13 +828,29 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         {!loading && matches.length === 0 ? (
           <p className="empty-state">まだ対局記録がありません。</p>
         ) : null}
+        {inputtingMatchCount > 0 ? (
+          <div className="unfinished-match-notice">
+            <strong>入力中の半荘があります</strong>
+            <span>
+              未終了の半荘を一番上に表示しています。続きの局入力または半荘終了をしてください。
+            </span>
+          </div>
+        ) : null}
         {matchBlocks.slice(0, 5).map((block) => (
-          <section key={block.blockId} className="match-block">
+          <section
+            key={block.blockId}
+            className={
+              block.inputtingMatchCount > 0 ? "match-block has-unfinished-match" : "match-block"
+            }
+          >
             <div className="match-block-header">
               <div>
                 <strong>{block.startedDate} の対局</strong>
                 <span className="muted">
                   {block.matches.length}半荘 / 終了 {block.finishedMatchCount}半荘
+                  {block.inputtingMatchCount > 0
+                    ? ` / 入力中 ${block.inputtingMatchCount}半荘`
+                    : ""}
                 </span>
               </div>
               {block.playerTotals.length > 0 ? (
@@ -824,7 +868,10 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
                 const recentResults = formatRecentResults(match.finalResults);
 
                 return (
-                  <div key={match.matchId} className="match-row">
+                  <div
+                    key={match.matchId}
+                    className={match.status === "inputting" ? "match-row is-unfinished" : "match-row"}
+                  >
                     <div>
                       <strong>{matchNumberLabel(match, index)}</strong>
                       {recentResults.length > 0 ? (

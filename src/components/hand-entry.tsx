@@ -1467,7 +1467,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                       </span>
                       <div className={isEditablePenalty ? "signed-score-input" : ""}>
                         <input
-                          inputMode={isEditablePenalty ? "text" : "numeric"}
+                          inputMode="numeric"
                           placeholder={isEditablePenalty ? "例: -1000" : undefined}
                           value={displayedScoreValue}
                           readOnly={

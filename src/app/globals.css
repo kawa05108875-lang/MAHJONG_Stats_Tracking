@@ -689,6 +689,11 @@ select:focus {
   background: #fbfdfc;
 }
 
+.match-block.has-unfinished-match {
+  border-color: rgba(180, 59, 45, 0.38);
+  background: #fffaf7;
+}
+
 .match-block-header {
   display: grid;
   gap: 6px;
@@ -720,6 +725,11 @@ select:focus {
   border-radius: 8px;
 }
 
+.match-row.is-unfinished {
+  border-color: rgba(180, 59, 45, 0.34);
+  background: #fff7f4;
+}
+
 .match-row > div {
   display: grid;
   gap: 4px;
@@ -735,6 +745,22 @@ select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.unfinished-match-notice {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(180, 59, 45, 0.34);
+  border-radius: 8px;
+  background: #fff7f4;
+  color: var(--foreground);
+}
+
+.unfinished-match-notice span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .match-result-summary span {
