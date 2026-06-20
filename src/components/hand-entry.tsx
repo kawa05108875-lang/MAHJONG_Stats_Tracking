@@ -1432,7 +1432,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                     {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name} 増減
                   </span>
                   <input
-                    inputMode="numeric"
+                    inputMode={handType === "penalty" ? "decimal" : "numeric"}
+                    placeholder={handType === "penalty" ? "例: -1000" : undefined}
                     value={
                       handType === "win" ||
                       handType === "draw" ||
@@ -1473,6 +1474,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 : ""}
               {handType === "abortive-draw"
                 ? " / 途中流局はリーチ棒だけ供託に入ります"
+                : ""}
+              {handType === "penalty"
+                ? " / 支払いはマイナス、受け取りはプラスで入力してください"
                 : ""}
             </p>
 
