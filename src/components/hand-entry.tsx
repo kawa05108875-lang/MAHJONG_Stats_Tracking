@@ -884,8 +884,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     ) {
       setError(
         winnerIsDealer
-          ? "親ツモの各自支払い点を入力してください。"
-          : "子ツモの親支払い点と子支払い点を入力してください。",
+          ? "親ツモのオール点を入力してください。"
+          : "子ツモの子支払い点と親支払い点を入力してください。",
       );
       return;
     }
@@ -1270,7 +1270,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 ) : winnerPlayerId ? (
                   winnerIsDealer ? (
                     <label>
-                      <span className="label">親ツモ 各自支払い点（素点・本場なし）</span>
+                      <span className="label">親ツモ オール（素点・本場なし）</span>
                       <input
                         inputMode="numeric"
                         value={dealerTsumoPoint}
@@ -1281,21 +1281,21 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                   ) : (
                     <div className="score-input-grid">
                       <label>
-                        <span>子ツモ 親支払い点（素点・本場なし）</span>
-                        <input
-                          inputMode="numeric"
-                          value={dealerTsumoPoint}
-                          onChange={(event) => setDealerTsumoPoint(event.target.value)}
-                          placeholder="例: 3900"
-                        />
-                      </label>
-                      <label>
                         <span>子ツモ 子支払い点（素点・本場なし）</span>
                         <input
                           inputMode="numeric"
                           value={childTsumoPoint}
                           onChange={(event) => setChildTsumoPoint(event.target.value)}
                           placeholder="例: 2000"
+                        />
+                      </label>
+                      <label>
+                        <span>子ツモ 親支払い点（素点・本場なし）</span>
+                        <input
+                          inputMode="numeric"
+                          value={dealerTsumoPoint}
+                          onChange={(event) => setDealerTsumoPoint(event.target.value)}
+                          placeholder="例: 3900"
                         />
                       </label>
                     </div>
