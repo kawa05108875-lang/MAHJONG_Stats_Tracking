@@ -628,10 +628,34 @@ select:focus {
 }
 
 .share-code {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.7;
   overflow-wrap: anywhere;
+}
+
+.share-code span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f8faf9;
+  color: var(--foreground);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.share-code .small-utility-button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 0.76rem;
 }
 
 .success-text {

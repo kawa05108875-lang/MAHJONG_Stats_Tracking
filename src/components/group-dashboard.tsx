@@ -92,6 +92,14 @@ function ruleFormKey(ruleForm: RuleForm) {
   return JSON.stringify(ruleForm);
 }
 
+function shortGroupId(groupId: string) {
+  if (groupId.length <= 12) {
+    return groupId;
+  }
+
+  return `${groupId.slice(0, 6)}...${groupId.slice(-4)}`;
+}
+
 export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -109,6 +117,7 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
     groupId: string;
     form: RuleForm;
   } | null>(null);
+  const [copiedGroupId, setCopiedGroupId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedGroup = useMemo(
@@ -253,9 +262,25 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
 
   function handleSelectGroup(groupId: string) {
     setSelectedGroupId(groupId);
+    setCopiedGroupId(null);
     setSelectedPlayerStatsId(null);
     setPlayerStatsReturnView("ranking");
     setActiveView("ranking");
+  }
+
+  async function copyGroupId(groupId: string) {
+    if (!navigator.clipboard) {
+      setError("このブラウザではコピーできません。グループIDを長押ししてコピーしてください。");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(groupId);
+      setCopiedGroupId(groupId);
+      setError(null);
+    } catch {
+      setError("グループIDをコピーできませんでした。IDを長押ししてコピーしてください。");
+    }
   }
 
   function openPlayerStats(playerId: string) {
@@ -429,7 +454,18 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                 <div>
                   <p className="eyebrow">Group Home</p>
                   <h2>{selectedGroup.name}</h2>
-                  <p className="share-code">グループID: {selectedGroup.groupId}</p>
+                  <div className="share-code">
+                    <span title={selectedGroup.groupId}>
+                      ID {shortGroupId(selectedGroup.groupId)}
+                    </span>
+                    <button
+                      type="button"
+                      className="small-utility-button"
+                      onClick={() => void copyGroupId(selectedGroup.groupId)}
+                    >
+                      {copiedGroupId === selectedGroup.groupId ? "コピー済み" : "コピー"}
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="button"
