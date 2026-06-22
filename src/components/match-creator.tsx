@@ -878,9 +878,9 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
               <div>
                 <strong>{block.startedDate} の対局</strong>
                 <span className="muted">
-                  {block.matches.length}半荘 / 終了 {block.finishedMatchCount}半荘
+                  {block.matches.length}半荘
                   {block.inputtingMatchCount > 0
-                    ? ` / 入力中 ${block.inputtingMatchCount}半荘`
+                    ? ` / 終了 ${block.finishedMatchCount}半荘 / 入力中 ${block.inputtingMatchCount}半荘`
                     : ""}
                 </span>
               </div>
