@@ -558,6 +558,16 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     });
   }
 
+  function randomizeSelectedSeats() {
+    if (selectedPlayers.length !== 4 || uniqueSelectedPlayerCount !== 4) {
+      return;
+    }
+
+    setSeatPlayerIds(
+      shuffleSeats(selectedPlayers).map((player) => player.playerId),
+    );
+  }
+
   async function handleCreateMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -822,6 +832,17 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
               </select>
             </label>
           ))}
+        </div>
+
+        <div className="row-actions">
+          <button
+            type="button"
+            className="compact-action-button"
+            onClick={randomizeSelectedSeats}
+            disabled={selectedPlayers.length !== 4 || uniqueSelectedPlayerCount !== 4}
+          >
+            席をランダム変更
+          </button>
         </div>
 
         <p className="notice-text">起家は東家として保存されます。</p>
