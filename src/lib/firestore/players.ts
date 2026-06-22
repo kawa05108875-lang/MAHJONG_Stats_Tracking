@@ -9,6 +9,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
+import { CURRENT_PLAYER_STATS_VERSION } from "@/lib/mahjong";
 import type { Match, Player } from "@/types";
 
 export type PlayerSummary = Pick<
@@ -20,6 +21,7 @@ function createInitialPlayerStats(playerId: string, groupId: string) {
   return {
     playerId,
     groupId,
+    statsVersion: CURRENT_PLAYER_STATS_VERSION,
     matchCount: 0,
     handCount: 0,
     totalPoint: 0,

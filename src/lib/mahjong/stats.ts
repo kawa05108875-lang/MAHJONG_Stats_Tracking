@@ -25,6 +25,8 @@ export type HandForStats = Pick<
 
 type MutableStats = Omit<PlayerStats, "updatedAt">;
 
+export const CURRENT_PLAYER_STATS_VERSION = 2;
+
 function divideOrZero(value: number, divisor: number) {
   return divisor === 0 ? 0 : value / divisor;
 }
@@ -33,6 +35,7 @@ function createEmptyStats(player: Pick<Player, "playerId" | "groupId">): Mutable
   return {
     playerId: player.playerId,
     groupId: player.groupId,
+    statsVersion: CURRENT_PLAYER_STATS_VERSION,
     matchCount: 0,
     handCount: 0,
     totalPoint: 0,
@@ -84,6 +87,10 @@ function applyHand(stats: MutableStats, hand: HandForStats) {
   );
 
   if (!joinedHand) {
+    return;
+  }
+
+  if (hand.handType === "penalty") {
     return;
   }
 

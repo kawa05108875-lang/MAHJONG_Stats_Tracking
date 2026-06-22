@@ -164,6 +164,7 @@ export type Hand = {
 export type PlayerStats = {
   playerId: string;
   groupId: string;
+  statsVersion: number;
   matchCount: number;
   handCount: number;
   totalPoint: number;

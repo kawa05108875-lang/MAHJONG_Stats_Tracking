@@ -126,6 +126,7 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
         "playerId",
         "groupId",
+        "statsVersion",
         "matchCount",
         "handCount",
         "totalPoint",
@@ -157,6 +158,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll([
           "playerId",
           "groupId",
+          "statsVersion",
           "matchCount",
           "handCount",
           "totalPoint",
@@ -187,6 +189,7 @@ service cloud.firestore {
         ])
         && request.resource.data.playerId == playerId
         && request.resource.data.groupId is string
+        && request.resource.data.statsVersion == 2
         && request.resource.data.matchCount is number
         && request.resource.data.handCount is number
         && request.resource.data.totalPoint is number

@@ -515,6 +515,10 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
         : tenpaiPlayerIds,
     [handType, riichiPlayerIds, tenpaiPlayerIds],
   );
+  const submittedRiichiPlayerIds = useMemo(
+    () => (handType === "penalty" ? [] : riichiPlayerIds),
+    [handType, riichiPlayerIds],
+  );
 
   const scoreDeltas = useMemo<ScoreDelta[]>(
     () => {
@@ -524,7 +528,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           winType,
           winnerPlayerIds: effectiveWinnerPlayerIds,
           loserPlayerId,
-          riichiPlayerIds,
+          riichiPlayerIds: submittedRiichiPlayerIds,
           ronPointsByWinner,
           dealerTsumoPoint: parseScore(dealerTsumoPoint),
           childTsumoPoint: parseScore(childTsumoPoint),
@@ -532,11 +536,11 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       }
 
       if (handType === "draw") {
-        return calculateDrawScoreDeltas(entryMatch, drawTenpaiPlayerIds, riichiPlayerIds);
+        return calculateDrawScoreDeltas(entryMatch, drawTenpaiPlayerIds, submittedRiichiPlayerIds);
       }
 
       if (handType === "abortive-draw") {
-        return calculateAbortiveDrawScoreDeltas(entryMatch, riichiPlayerIds);
+        return calculateAbortiveDrawScoreDeltas(entryMatch, submittedRiichiPlayerIds);
       }
 
       return entryMatch.players.map((player) => ({
@@ -551,7 +555,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       handType,
       loserPlayerId,
       effectiveWinnerPlayerIds,
-      riichiPlayerIds,
+      submittedRiichiPlayerIds,
       ronPointsByWinner,
       scoreInputs,
       drawTenpaiPlayerIds,
@@ -570,7 +574,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     scoreDeltaTotal === expectedScoreDeltaTotal;
   const nextRiichiSticks =
     handType === "draw" || handType === "abortive-draw"
-      ? entryMatch.currentRiichiSticks + riichiPlayerIds.length
+      ? entryMatch.currentRiichiSticks + submittedRiichiPlayerIds.length
       : handType === "penalty"
         ? entryMatch.currentRiichiSticks
       : 0;
@@ -702,9 +706,11 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setAbortiveDrawProgression("repeat");
     setScoreInputs(type === "penalty" ? createBlankScoreInputs(match) : createEmptyScoreInputs(match));
     setRonWinnerCount(1);
-    if (nextAbortiveDrawType === "fourRiichi") {
-      setRiichiPlayerIds(currentSeatPlayers.map((player) => player.playerId));
-    }
+    setRiichiPlayerIds(
+      nextAbortiveDrawType === "fourRiichi"
+        ? currentSeatPlayers.map((player) => player.playerId)
+        : [],
+    );
     setDrawRiichiSticksConfirmed(false);
   }
 
@@ -743,7 +749,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setWinType(hand.winType ?? "ron");
     setAbortiveDrawType(hand.abortiveDrawType ?? "");
     setAbortiveDrawProgression(hand.abortiveDrawProgression ?? "repeat");
-    setRiichiPlayerIds(hand.riichiPlayerIds);
+    setRiichiPlayerIds(hand.handType === "penalty" ? [] : hand.riichiPlayerIds);
     setTenpaiPlayerIds(hand.tenpaiPlayerIds ?? []);
     setWinnerPlayerId(winners[0] ?? "");
     setWinnerPlayerIds(winners);
@@ -989,7 +995,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           handType === "abortive-draw" && abortiveDrawType ? abortiveDrawType : undefined,
         abortiveDrawProgression:
           handType === "abortive-draw" ? abortiveDrawProgression : undefined,
-        riichiPlayerIds,
+        riichiPlayerIds: submittedRiichiPlayerIds,
         winnerPlayerId: handType === "win" ? effectiveWinnerPlayerIds[0] : undefined,
         winnerPlayerIds: handType === "win" ? effectiveWinnerPlayerIds : undefined,
         loserPlayerId: handType === "win" && winType === "ron" ? loserPlayerId : undefined,
@@ -1413,21 +1419,23 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               </>
             ) : null}
 
-            <div className="check-list">
-              <span className="label">リーチ者</span>
-              {currentSeatPlayers.map((player) => (
-                <label key={player.playerId} className="check-row">
-                  <input
-                    type="checkbox"
-                    checked={riichiPlayerIds.includes(player.playerId)}
-                    onChange={() => toggleRiichiPlayerId(player.playerId)}
-                  />
-                  <span>
-                    {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name}
-                  </span>
-                </label>
-              ))}
-            </div>
+            {handType !== "penalty" ? (
+              <div className="check-list">
+                <span className="label">リーチ者</span>
+                {currentSeatPlayers.map((player) => (
+                  <label key={player.playerId} className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={riichiPlayerIds.includes(player.playerId)}
+                      onChange={() => toggleRiichiPlayerId(player.playerId)}
+                    />
+                    <span>
+                      {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
 
             {handType === "draw" ? (
               <div className="notice">

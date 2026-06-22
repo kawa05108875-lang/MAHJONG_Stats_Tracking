@@ -8,7 +8,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
-import { calculatePlayerStats } from "@/lib/mahjong";
+import { CURRENT_PLAYER_STATS_VERSION, calculatePlayerStats } from "@/lib/mahjong";
 import type { Hand, Match, Player, PlayerStats } from "@/types";
 
 export type PlayerStatsSummary = PlayerStats & {
@@ -20,6 +20,7 @@ function createEmptyStatsSummary(player: Pick<Player, "playerId" | "groupId" | "
     playerId: player.playerId,
     groupId: player.groupId,
     name: player.name,
+    statsVersion: CURRENT_PLAYER_STATS_VERSION,
     matchCount: 0,
     handCount: 0,
     totalPoint: 0,
@@ -53,6 +54,7 @@ function createEmptyStatsSummary(player: Pick<Player, "playerId" | "groupId" | "
 function hasCurrentStatsFields(stats: PlayerStats | undefined) {
   return (
     !!stats &&
+    stats.statsVersion === CURRENT_PLAYER_STATS_VERSION &&
     typeof stats.riichiCount === "number" &&
     typeof stats.riichiRate === "number" &&
     typeof stats.totalWinScore === "number" &&
@@ -151,6 +153,7 @@ export async function getGroupPlayerStats(groupId: string): Promise<PlayerStatsS
       return {
         ...stats,
         name: player.name,
+        statsVersion: stats.statsVersion ?? 1,
         riichiCount: stats.riichiCount ?? 0,
         totalWinScore: stats.totalWinScore ?? 0,
         averageWinScore: stats.averageWinScore ?? 0,
