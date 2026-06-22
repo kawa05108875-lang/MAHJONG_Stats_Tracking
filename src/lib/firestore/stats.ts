@@ -27,10 +27,14 @@ function createEmptyStatsSummary(player: Pick<Player, "playerId" | "groupId" | "
     averageRank: 0,
     totalScore: 0,
     averageScore: 0,
+    riichiCount: 0,
     winCount: 0,
     dealInCount: 0,
     tsumoWinCount: 0,
     ronWinCount: 0,
+    totalWinScore: 0,
+    averageWinScore: 0,
+    riichiRate: 0,
     firstPlaceCount: 0,
     secondPlaceCount: 0,
     thirdPlaceCount: 0,
@@ -44,6 +48,16 @@ function createEmptyStatsSummary(player: Pick<Player, "playerId" | "groupId" | "
     fourthPlaceRate: 0,
     updatedAt: new Date(),
   } satisfies PlayerStatsSummary;
+}
+
+function hasCurrentStatsFields(stats: PlayerStats | undefined) {
+  return (
+    !!stats &&
+    typeof stats.riichiCount === "number" &&
+    typeof stats.riichiRate === "number" &&
+    typeof stats.totalWinScore === "number" &&
+    typeof stats.averageWinScore === "number"
+  );
 }
 
 async function getGroupPlayersForStats(groupId: string) {
@@ -114,10 +128,21 @@ export async function getGroupPlayerStats(groupId: string): Promise<PlayerStatsS
       return [stats.playerId, stats] as const;
     }),
   );
+  const needsStatsRefresh = players.some(
+    (player) => !hasCurrentStatsFields(statsByPlayerId.get(player.playerId)),
+  );
+  const effectiveStatsByPlayerId = needsStatsRefresh
+    ? new Map(
+        (await recalculateGroupPlayerStats(groupId)).map((stats) => [
+          stats.playerId,
+          stats,
+        ] as const),
+      )
+    : statsByPlayerId;
 
   return players
     .map((player) => {
-      const stats = statsByPlayerId.get(player.playerId);
+      const stats = effectiveStatsByPlayerId.get(player.playerId);
 
       if (!stats) {
         return createEmptyStatsSummary(player);
@@ -126,6 +151,10 @@ export async function getGroupPlayerStats(groupId: string): Promise<PlayerStatsS
       return {
         ...stats,
         name: player.name,
+        riichiCount: stats.riichiCount ?? 0,
+        totalWinScore: stats.totalWinScore ?? 0,
+        averageWinScore: stats.averageWinScore ?? 0,
+        riichiRate: stats.riichiRate ?? 0,
       } satisfies PlayerStatsSummary;
     })
     .sort((left, right) => right.totalPoint - left.totalPoint);

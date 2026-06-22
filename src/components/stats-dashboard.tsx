@@ -22,6 +22,9 @@ type SortKey =
   | "averageRank"
   | "averagePoint"
   | "winRate"
+  | "riichiRate"
+  | "tsumoRate"
+  | "averageWinScore"
   | "dealInRate"
   | "firstPlaceRate"
   | "secondOrBetterRate"
@@ -32,6 +35,9 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: "averageRank", label: "平均順位" },
   { key: "averagePoint", label: "平均ポイント" },
   { key: "winRate", label: "和了率" },
+  { key: "riichiRate", label: "立直率" },
+  { key: "tsumoRate", label: "ツモ率" },
+  { key: "averageWinScore", label: "平均打点" },
   { key: "dealInRate", label: "放銃率" },
   { key: "firstPlaceRate", label: "トップ率" },
   { key: "secondOrBetterRate", label: "連対率" },
@@ -48,6 +54,10 @@ function formatRate(value: number) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+function formatScore(value: number) {
+  return `${Math.round(value).toLocaleString()}点`;
+}
+
 function statValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
   const value = playerStats[sortKey];
 
@@ -59,6 +69,8 @@ function formatSortValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
 
   if (
     sortKey === "winRate" ||
+    sortKey === "riichiRate" ||
+    sortKey === "tsumoRate" ||
     sortKey === "dealInRate" ||
     sortKey === "firstPlaceRate" ||
     sortKey === "secondOrBetterRate" ||
@@ -69,6 +81,10 @@ function formatSortValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
 
   if (sortKey === "averageRank") {
     return value.toFixed(2);
+  }
+
+  if (sortKey === "averageWinScore") {
+    return formatScore(value);
   }
 
   return formatPoint(value);
@@ -153,12 +169,20 @@ function StatsDetailCard({ playerStats }: { playerStats: PlayerStatsSummary }) {
           <strong>{formatRate(playerStats.winRate)}</strong>
         </div>
         <div className="metric">
+          <span className="label">立直率</span>
+          <strong>{formatRate(playerStats.riichiRate)}</strong>
+        </div>
+        <div className="metric">
           <span className="label">放銃率</span>
           <strong>{formatRate(playerStats.dealInRate)}</strong>
         </div>
         <div className="metric">
           <span className="label">ツモ率</span>
           <strong>{formatRate(playerStats.tsumoRate)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">平均打点</span>
+          <strong>{formatScore(playerStats.averageWinScore)}</strong>
         </div>
         <div className="metric">
           <span className="label">ロン率</span>

@@ -16,6 +16,7 @@ export type HandForStats = Pick<
   Hand,
   | "handType"
   | "winType"
+  | "riichiPlayerIds"
   | "winnerPlayerId"
   | "winnerPlayerIds"
   | "loserPlayerId"
@@ -39,10 +40,14 @@ function createEmptyStats(player: Pick<Player, "playerId" | "groupId">): Mutable
     averageRank: 0,
     totalScore: 0,
     averageScore: 0,
+    riichiCount: 0,
     winCount: 0,
     dealInCount: 0,
     tsumoWinCount: 0,
     ronWinCount: 0,
+    totalWinScore: 0,
+    averageWinScore: 0,
+    riichiRate: 0,
     firstPlaceCount: 0,
     secondPlaceCount: 0,
     thirdPlaceCount: 0,
@@ -84,6 +89,10 @@ function applyHand(stats: MutableStats, hand: HandForStats) {
 
   stats.handCount += 1;
 
+  if (hand.riichiPlayerIds.includes(stats.playerId)) {
+    stats.riichiCount += 1;
+  }
+
   if (hand.handType !== "win") {
     return;
   }
@@ -91,7 +100,12 @@ function applyHand(stats: MutableStats, hand: HandForStats) {
   const winnerPlayerIds = hand.winnerPlayerIds ?? (hand.winnerPlayerId ? [hand.winnerPlayerId] : []);
 
   if (winnerPlayerIds.includes(stats.playerId)) {
+    const scoreDelta = hand.scoreDeltas.find(
+      (delta) => delta.playerId === stats.playerId,
+    );
+
     stats.winCount += 1;
+    stats.totalWinScore += Math.max(scoreDelta?.delta ?? 0, 0);
 
     if (hand.winType === "tsumo") {
       stats.tsumoWinCount += 1;
@@ -117,6 +131,8 @@ function finalizeStats(stats: MutableStats, updatedAt: AppTimestamp): PlayerStat
     averagePoint: divideOrZero(stats.totalPoint, stats.matchCount),
     averageRank: divideOrZero(rankTotal, stats.matchCount),
     averageScore: divideOrZero(stats.totalScore, stats.matchCount),
+    averageWinScore: divideOrZero(stats.totalWinScore, stats.winCount),
+    riichiRate: divideOrZero(stats.riichiCount, stats.handCount),
     winRate: divideOrZero(stats.winCount, stats.handCount),
     dealInRate: divideOrZero(stats.dealInCount, stats.handCount),
     tsumoRate: divideOrZero(stats.tsumoWinCount, stats.handCount),
