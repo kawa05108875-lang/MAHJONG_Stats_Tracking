@@ -240,6 +240,10 @@ function isLatestMatchInBlock(matches: MatchSummary[], targetMatch: MatchSummary
   return latestMatch?.matchId === targetMatch.matchId;
 }
 
+function latestMatchInBlock(block: MatchBlockSummary) {
+  return [...block.matches].sort((left, right) => compareMatchBlockOrder(right, left))[0] ?? null;
+}
+
 function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[] {
   const blocksById = new Map<string, MatchSummary[]>();
 
@@ -388,27 +392,6 @@ function MatchResultPanel({
   onStartNextMatch: () => void;
   onShuffleSeats: () => void;
 }) {
-  const nextMatchButton = (
-    <button
-      type="button"
-      className={shouldPrioritizeShuffle ? "" : "primary-inline-button"}
-      disabled={startingNextMatch !== null}
-      onClick={onStartNextMatch}
-    >
-      {startingNextMatch === "rotate" ? "作成中..." : "次の半荘を開始"}
-    </button>
-  );
-  const shuffleButton = (
-    <button
-      type="button"
-      className={shouldPrioritizeShuffle ? "primary-inline-button" : ""}
-      disabled={startingNextMatch !== null}
-      onClick={onShuffleSeats}
-    >
-      {startingNextMatch === "shuffle" ? "作成中..." : "席替え"}
-    </button>
-  );
-
   return (
     <section className="result-panel">
       <div className="section-header">
@@ -433,12 +416,54 @@ function MatchResultPanel({
       </div>
       {rotateNotice ? <p className="notice-text">{rotateNotice}</p> : null}
       {showFollowUpActions ? (
-        <div className="row-actions result-actions">
-          {shouldPrioritizeShuffle ? null : nextMatchButton}
-          {shuffleButton}
-        </div>
+        <FollowUpMatchActions
+          shouldPrioritizeShuffle={shouldPrioritizeShuffle}
+          startingNextMatch={startingNextMatch}
+          onStartNextMatch={onStartNextMatch}
+          onShuffleSeats={onShuffleSeats}
+        />
       ) : null}
     </section>
+  );
+}
+
+function FollowUpMatchActions({
+  shouldPrioritizeShuffle,
+  startingNextMatch,
+  onStartNextMatch,
+  onShuffleSeats,
+}: {
+  shouldPrioritizeShuffle: boolean;
+  startingNextMatch: NextMatchMode | null;
+  onStartNextMatch: () => void;
+  onShuffleSeats: () => void;
+}) {
+  const nextMatchButton = (
+    <button
+      type="button"
+      className={shouldPrioritizeShuffle ? "" : "primary-inline-button"}
+      disabled={startingNextMatch !== null}
+      onClick={onStartNextMatch}
+    >
+      {startingNextMatch === "rotate" ? "作成中..." : "次の半荘を開始"}
+    </button>
+  );
+  const shuffleButton = (
+    <button
+      type="button"
+      className={shouldPrioritizeShuffle ? "primary-inline-button" : ""}
+      disabled={startingNextMatch !== null}
+      onClick={onShuffleSeats}
+    >
+      {startingNextMatch === "shuffle" ? "作成中..." : "席替え"}
+    </button>
+  );
+
+  return (
+    <div className="row-actions result-actions">
+      {shouldPrioritizeShuffle ? null : nextMatchButton}
+      {shuffleButton}
+    </div>
   );
 }
 
@@ -489,6 +514,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     () => createMatchBlockYearSummaries(matchBlocks),
     [matchBlocks],
   );
+  const latestMatchBlockId = matchBlocks[0]?.blockId ?? null;
   const inputtingMatchCount = useMemo(
     () => matches.filter((match) => match.status === "inputting").length,
     [matches],
@@ -693,14 +719,12 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     }
   }
 
-  async function createFollowUpMatch(mode: NextMatchMode) {
-    if (!selectedMatch) {
-      return;
-    }
+  async function createFollowUpMatchFrom(sourceMatch: MatchSummary, mode: NextMatchMode) {
+    const recentMatchCount = countRecentRotatedMatches(matches, sourceMatch);
 
-    if (mode === "shuffle" && recentSamePlayerMatchCount % 4 !== 0) {
+    if (mode === "shuffle" && recentMatchCount % 4 !== 0) {
       const confirmed = window.confirm(
-        `同じ4人でまだ第${recentSamePlayerMatchCount}半荘です。4半荘前ですが席替えしますか？`,
+        `同じ4人でまだ第${recentMatchCount}半荘です。4半荘前ですが席替えしますか？`,
       );
 
       if (!confirmed) {
@@ -714,13 +738,13 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
 
     try {
       const nextPlayers =
-        mode === "rotate" ? rotateDealer(selectedMatch.players) : shuffleSeats(selectedMatch.players);
+        mode === "rotate" ? rotateDealer(sourceMatch.players) : shuffleSeats(sourceMatch.players);
       const nextDate = todayString();
       const blockAssignment = determineMatchBlockAssignment(
         matches,
         nextDate,
         nextPlayers,
-        selectedMatch,
+        sourceMatch,
       );
       const matchId = await createMatch({
         groupId: group.groupId,
@@ -752,14 +776,20 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     }
   }
 
-  function prepareShuffledMatchCreation() {
+  function createFollowUpMatch(mode: NextMatchMode) {
     if (!selectedMatch) {
       return;
     }
 
-    if (recentSamePlayerMatchCount % 4 !== 0) {
+    void createFollowUpMatchFrom(selectedMatch, mode);
+  }
+
+  function prepareShuffledMatchCreationFrom(sourceMatch: MatchSummary) {
+    const recentMatchCount = countRecentRotatedMatches(matches, sourceMatch);
+
+    if (recentMatchCount % 4 !== 0) {
       const confirmed = window.confirm(
-        `同じ4人でまだ第${recentSamePlayerMatchCount}半荘です。4半荘前ですが席替えしますか？`,
+        `同じ4人でまだ第${recentMatchCount}半荘です。4半荘前ですが席替えしますか？`,
       );
 
       if (!confirmed) {
@@ -767,7 +797,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       }
     }
 
-    const nextPlayers = shuffleSeats(selectedMatch.players);
+    const nextPlayers = shuffleSeats(sourceMatch.players);
 
     setDate(todayString());
     setSeatPlayerIds(
@@ -776,6 +806,14 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     setCreatedMatchId(null);
     setSelectedMatchId(null);
     setMatchView("create");
+  }
+
+  function prepareShuffledMatchCreation() {
+    if (!selectedMatch) {
+      return;
+    }
+
+    prepareShuffledMatchCreationFrom(selectedMatch);
   }
 
   function openMatch(matchId: string) {
@@ -959,6 +997,16 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
               {yearSummary.blocks.map((block) => {
                 const isExpanded =
                   block.inputtingMatchCount > 0 || expandedMatchBlockIds.has(block.blockId);
+                const latestBlockMatch = latestMatchInBlock(block);
+                const isLatestMatchBlock =
+                  latestMatchBlockId === block.blockId && latestBlockMatch?.status === "finished";
+                const latestBlockRecentMatchCount = latestBlockMatch
+                  ? countRecentRotatedMatches(matches, latestBlockMatch)
+                  : 0;
+                const shouldPrioritizeLatestBlockShuffle =
+                  isLatestMatchBlock &&
+                  latestBlockRecentMatchCount > 0 &&
+                  latestBlockRecentMatchCount % 4 === 0;
 
                 return (
                   <section
@@ -1000,6 +1048,14 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
                             ? "対局一覧を隠す"
                             : "対局一覧を表示"}
                       </button>
+                      {isLatestMatchBlock && latestBlockMatch ? (
+                        <FollowUpMatchActions
+                          shouldPrioritizeShuffle={shouldPrioritizeLatestBlockShuffle}
+                          startingNextMatch={startingNextMatch}
+                          onStartNextMatch={() => void createFollowUpMatchFrom(latestBlockMatch, "rotate")}
+                          onShuffleSeats={() => prepareShuffledMatchCreationFrom(latestBlockMatch)}
+                        />
+                      ) : null}
                     </div>
                     {isExpanded ? (
                       <div className="match-block-list">
