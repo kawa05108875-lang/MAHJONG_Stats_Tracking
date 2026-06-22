@@ -10,6 +10,7 @@ import {
 } from "@/lib/firestore/matches";
 import { deleteMatchData } from "@/lib/firestore/maintenance";
 import { getGroupPlayers, type PlayerSummary } from "@/lib/firestore/players";
+import { recalculateGroupPlayerStats } from "@/lib/firestore/stats";
 import type { GroupSummary } from "@/lib/firestore/groups";
 import type {
   MatchFinalResult,
@@ -51,6 +52,14 @@ type MatchBlockAssignment = {
 };
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
+
+function notifyStatsChanged(groupId: string) {
+  window.dispatchEvent(
+    new CustomEvent("mahjong:stats-changed", {
+      detail: { groupId },
+    }),
+  );
+}
 
 function todayString() {
   const today = new Date();
@@ -693,6 +702,8 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         groupId: group.groupId,
         matchId: match.matchId,
       });
+      await recalculateGroupPlayerStats(group.groupId);
+      notifyStatsChanged(group.groupId);
 
       if (selectedMatchId === match.matchId) {
         setSelectedMatchId(null);
