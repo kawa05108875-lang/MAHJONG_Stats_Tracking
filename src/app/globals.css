@@ -709,6 +709,10 @@ select:focus {
   gap: 6px;
 }
 
+.match-block-toggle {
+  justify-self: end;
+}
+
 .match-block-list {
   display: grid;
   gap: 6px;

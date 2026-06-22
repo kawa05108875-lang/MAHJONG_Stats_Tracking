@@ -405,6 +405,9 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [matchView, setMatchView] = useState<MatchView>("list");
+  const [expandedMatchBlockIds, setExpandedMatchBlockIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const selectedPlayers = useMemo(
     () =>
@@ -717,6 +720,20 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     setCreatedMatchId(null);
   }
 
+  function toggleMatchBlock(blockId: string) {
+    setExpandedMatchBlockIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(blockId)) {
+        next.delete(blockId);
+      } else {
+        next.add(blockId);
+      }
+
+      return next;
+    });
+  }
+
   return (
     <section className="manager-panel">
       <div className="section-header">
@@ -846,8 +863,12 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             </span>
           </div>
         ) : null}
-        {matchBlocks.slice(0, 5).map((block) => (
-          <section
+        {matchBlocks.slice(0, 5).map((block) => {
+          const isExpanded =
+            block.inputtingMatchCount > 0 || expandedMatchBlockIds.has(block.blockId);
+
+          return (
+            <section
             key={block.blockId}
             className={
               block.inputtingMatchCount > 0 ? "match-block has-unfinished-match" : "match-block"
@@ -871,9 +892,24 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
                     </span>
                   ))}
                 </div>
-              ) : null}
+              ) : (
+                <p className="muted">終了した半荘がまだありません。</p>
+              )}
+              <button
+                type="button"
+                className="compact-action-button match-block-toggle"
+                onClick={() => toggleMatchBlock(block.blockId)}
+                disabled={block.inputtingMatchCount > 0}
+              >
+                {block.inputtingMatchCount > 0
+                  ? "入力中を表示中"
+                  : isExpanded
+                    ? "対局一覧を隠す"
+                    : "対局一覧を表示"}
+              </button>
             </div>
-            <div className="match-block-list">
+              {isExpanded ? (
+                <div className="match-block-list">
               {block.matches.map((match, index) => {
                 const recentResults = formatRecentResults(match.finalResults);
 
@@ -913,9 +949,11 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
                   </div>
                 );
               })}
-            </div>
-          </section>
-        ))}
+                </div>
+              ) : null}
+            </section>
+          );
+        })}
         </div>
       ) : null}
     </section>
