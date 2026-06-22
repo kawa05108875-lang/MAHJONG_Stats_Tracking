@@ -1601,7 +1601,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               </strong>
               <span className="muted">
                 {hand.handType === "win"
-                  ? `和了: ${playerNames(match, hand.winnerPlayerIds ?? (hand.winnerPlayerId ? [hand.winnerPlayerId] : []))} / 放銃: ${playerName(match, hand.loserPlayerId)}`
+                  ? `和了: ${playerNames(match, hand.winnerPlayerIds ?? (hand.winnerPlayerId ? [hand.winnerPlayerId] : []))}${
+                      hand.winType === "tsumo" ? "" : ` / 放銃: ${playerName(match, hand.loserPlayerId)}`
+                    }`
                   : hand.handType === "draw"
                     ? `聴牌: ${(hand.tenpaiPlayerIds ?? []).map((playerId) => playerName(match, playerId)).join(" / ") || "-"}`
                     : hand.handType === "abortive-draw"
