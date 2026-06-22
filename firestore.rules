@@ -133,10 +133,14 @@ service cloud.firestore {
         "averageRank",
         "totalScore",
         "averageScore",
+        "riichiCount",
         "winCount",
         "dealInCount",
         "tsumoWinCount",
         "ronWinCount",
+        "totalWinScore",
+        "averageWinScore",
+        "riichiRate",
         "firstPlaceCount",
         "secondPlaceCount",
         "thirdPlaceCount",
@@ -160,10 +164,14 @@ service cloud.firestore {
           "averageRank",
           "totalScore",
           "averageScore",
+          "riichiCount",
           "winCount",
           "dealInCount",
           "tsumoWinCount",
           "ronWinCount",
+          "totalWinScore",
+          "averageWinScore",
+          "riichiRate",
           "firstPlaceCount",
           "secondPlaceCount",
           "thirdPlaceCount",
@@ -186,10 +194,14 @@ service cloud.firestore {
         && request.resource.data.averageRank is number
         && request.resource.data.totalScore is number
         && request.resource.data.averageScore is number
+        && request.resource.data.riichiCount is number
         && request.resource.data.winCount is number
         && request.resource.data.dealInCount is number
         && request.resource.data.tsumoWinCount is number
         && request.resource.data.ronWinCount is number
+        && request.resource.data.totalWinScore is number
+        && request.resource.data.averageWinScore is number
+        && request.resource.data.riichiRate is number
         && request.resource.data.firstPlaceCount is number
         && request.resource.data.secondPlaceCount is number
         && request.resource.data.thirdPlaceCount is number
