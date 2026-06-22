@@ -680,6 +680,30 @@ select:focus {
   font-size: 1rem;
 }
 
+.match-year-section {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.match-year-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.match-year-header strong {
+  font-size: 0.98rem;
+}
+
+.match-year-blocks {
+  display: grid;
+  gap: 8px;
+}
+
 .match-block {
   display: grid;
   gap: 8px;

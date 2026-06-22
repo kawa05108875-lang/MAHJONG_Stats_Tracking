@@ -38,6 +38,12 @@ type MatchBlockSummary = {
   inputtingMatchCount: number;
   playerTotals: MatchBlockPlayerTotal[];
 };
+type MatchBlockYearSummary = {
+  year: string;
+  blocks: MatchBlockSummary[];
+  matchCount: number;
+  inputtingMatchCount: number;
+};
 type MatchBlockAssignment = {
   matchBlockId?: string;
   matchBlockNumber?: number;
@@ -179,6 +185,10 @@ function matchBlockStartedDate(match: MatchSummary) {
   return match.matchBlockStartedDate ?? match.date;
 }
 
+function matchBlockYear(block: MatchBlockSummary) {
+  return block.startedDate.slice(0, 4);
+}
+
 function matchNumberLabel(match: MatchSummary, index: number) {
   return `第${match.matchBlockNumber ?? index + 1}半荘`;
 }
@@ -310,6 +320,27 @@ function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[]
 
       return timestampSeconds(rightLatest.createdAt) - timestampSeconds(leftLatest.createdAt);
     });
+}
+
+function createMatchBlockYearSummaries(blocks: MatchBlockSummary[]): MatchBlockYearSummary[] {
+  const yearsById = new Map<string, MatchBlockYearSummary>();
+
+  for (const block of blocks) {
+    const year = matchBlockYear(block);
+    const current = yearsById.get(year) ?? {
+      year,
+      blocks: [],
+      matchCount: 0,
+      inputtingMatchCount: 0,
+    };
+
+    current.blocks.push(block);
+    current.matchCount += block.matches.length;
+    current.inputtingMatchCount += block.inputtingMatchCount;
+    yearsById.set(year, current);
+  }
+
+  return Array.from(yearsById.values());
 }
 
 function determineMatchBlockAssignment(
@@ -454,6 +485,10 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     [matches, selectedMatchId],
   );
   const matchBlocks = useMemo(() => createMatchBlockSummaries(matches), [matches]);
+  const matchBlockYears = useMemo(
+    () => createMatchBlockYearSummaries(matchBlocks),
+    [matchBlocks],
+  );
   const inputtingMatchCount = useMemo(
     () => matches.filter((match) => match.status === "inputting").length,
     [matches],
@@ -909,97 +944,112 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
             </span>
           </div>
         ) : null}
-        {matchBlocks.slice(0, 5).map((block) => {
-          const isExpanded =
-            block.inputtingMatchCount > 0 || expandedMatchBlockIds.has(block.blockId);
-
-          return (
-            <section
-            key={block.blockId}
-            className={
-              block.inputtingMatchCount > 0 ? "match-block has-unfinished-match" : "match-block"
-            }
-          >
-            <div className="match-block-header">
-              <div>
-                <strong>{block.startedDate} の対局</strong>
-                <span className="muted">
-                  {block.matches.length}半荘
-                  {block.inputtingMatchCount > 0
-                    ? ` / 終了 ${block.finishedMatchCount}半荘 / 入力中 ${block.inputtingMatchCount}半荘`
-                    : ""}
-                </span>
-              </div>
-              {block.playerTotals.length > 0 ? (
-                <div className="match-result-summary match-block-total-ranking">
-                  {block.playerTotals.map((playerTotal, index) => (
-                    <span key={playerTotal.playerId}>
-                      {index + 1}位 {playerTotal.name} {playerTotal.totalPoint.toFixed(1)}pt
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">終了した半荘がまだありません。</p>
-              )}
-              <button
-                type="button"
-                className="compact-action-button match-block-toggle"
-                onClick={() => toggleMatchBlock(block.blockId)}
-                disabled={block.inputtingMatchCount > 0}
-              >
-                {block.inputtingMatchCount > 0
-                  ? "入力中を表示中"
-                  : isExpanded
-                    ? "対局一覧を隠す"
-                    : "対局一覧を表示"}
-              </button>
+        {matchBlockYears.map((yearSummary) => (
+          <section key={yearSummary.year} className="match-year-section">
+            <div className="match-year-header">
+              <strong>{yearSummary.year}年</strong>
+              <span className="muted">
+                {yearSummary.blocks.length}ブロック / {yearSummary.matchCount}半荘
+                {yearSummary.inputtingMatchCount > 0
+                  ? ` / 入力中 ${yearSummary.inputtingMatchCount}半荘`
+                  : ""}
+              </span>
             </div>
-              {isExpanded ? (
-                <div className="match-block-list">
-              {block.matches.map((match, index) => {
-                const recentResults = formatRecentResults(match.finalResults);
+            <div className="match-year-blocks">
+              {yearSummary.blocks.map((block) => {
+                const isExpanded =
+                  block.inputtingMatchCount > 0 || expandedMatchBlockIds.has(block.blockId);
 
                 return (
-                  <div
-                    key={match.matchId}
-                    className={match.status === "inputting" ? "match-row is-unfinished" : "match-row"}
+                  <section
+                    key={block.blockId}
+                    className={
+                      block.inputtingMatchCount > 0 ? "match-block has-unfinished-match" : "match-block"
+                    }
                   >
-                    <div>
-                      <strong>{matchNumberLabel(match, index)}</strong>
-                      {recentResults.length > 0 ? (
-                        <div className="match-result-summary">
-                          {recentResults.map((result) => (
-                            <span key={result.playerId}>{result.label}</span>
+                    <div className="match-block-header">
+                      <div>
+                        <strong>{block.startedDate} の対局</strong>
+                        <span className="muted">
+                          {block.matches.length}半荘
+                          {block.inputtingMatchCount > 0
+                            ? ` / 終了 ${block.finishedMatchCount}半荘 / 入力中 ${block.inputtingMatchCount}半荘`
+                            : ""}
+                        </span>
+                      </div>
+                      {block.playerTotals.length > 0 ? (
+                        <div className="match-result-summary match-block-total-ranking">
+                          {block.playerTotals.map((playerTotal, index) => (
+                            <span key={playerTotal.playerId}>
+                              {index + 1}位 {playerTotal.name} {playerTotal.totalPoint.toFixed(1)}pt
+                            </span>
                           ))}
                         </div>
-                      ) : null}
+                      ) : (
+                        <p className="muted">終了した半荘がまだありません。</p>
+                      )}
+                      <button
+                        type="button"
+                        className="compact-action-button match-block-toggle"
+                        onClick={() => toggleMatchBlock(block.blockId)}
+                        disabled={block.inputtingMatchCount > 0}
+                      >
+                        {block.inputtingMatchCount > 0
+                          ? "入力中を表示中"
+                          : isExpanded
+                            ? "対局一覧を隠す"
+                            : "対局一覧を表示"}
+                      </button>
                     </div>
-                    <span className="status-pill linked">
-                      {statusLabel(match.status)}
-                    </span>
-                    <button
-                      type="button"
-                      className="compact-action-button"
-                      onClick={() => openMatch(match.matchId)}
-                    >
-                      {match.status === "finished" ? "結果" : "対局結果入力"}
-                    </button>
-                    <button
-                      type="button"
-                      className="compact-action-button danger-button"
-                      onClick={() => void handleDeleteMatch(match)}
-                      disabled={deletingMatchId === match.matchId}
-                    >
-                      {deletingMatchId === match.matchId ? "削除中..." : "削除"}
-                    </button>
-                  </div>
+                    {isExpanded ? (
+                      <div className="match-block-list">
+                        {block.matches.map((match, index) => {
+                          const recentResults = formatRecentResults(match.finalResults);
+
+                          return (
+                            <div
+                              key={match.matchId}
+                              className={match.status === "inputting" ? "match-row is-unfinished" : "match-row"}
+                            >
+                              <div>
+                                <strong>{matchNumberLabel(match, index)}</strong>
+                                {recentResults.length > 0 ? (
+                                  <div className="match-result-summary">
+                                    {recentResults.map((result) => (
+                                      <span key={result.playerId}>{result.label}</span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <span className="status-pill linked">
+                                {statusLabel(match.status)}
+                              </span>
+                              <button
+                                type="button"
+                                className="compact-action-button"
+                                onClick={() => openMatch(match.matchId)}
+                              >
+                                {match.status === "finished" ? "結果" : "対局結果入力"}
+                              </button>
+                              <button
+                                type="button"
+                                className="compact-action-button danger-button"
+                                onClick={() => void handleDeleteMatch(match)}
+                                disabled={deletingMatchId === match.matchId}
+                              >
+                                {deletingMatchId === match.matchId ? "削除中..." : "削除"}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </section>
                 );
               })}
-                </div>
-              ) : null}
-            </section>
-          );
-        })}
+            </div>
+          </section>
+        ))}
         </div>
       ) : null}
     </section>
