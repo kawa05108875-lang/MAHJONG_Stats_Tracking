@@ -78,6 +78,10 @@ function createEmptyScoreInputs(match: MatchSummary) {
   return Object.fromEntries(match.players.map((player) => [player.playerId, "0"]));
 }
 
+function createBlankScoreInputs(match: MatchSummary) {
+  return Object.fromEntries(match.players.map((player) => [player.playerId, ""]));
+}
+
 function applyScoreDeltas(
   currentScores: Record<string, number>,
   scoreDeltas: ScoreDelta[],
@@ -656,12 +660,12 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   }
 
   function setPenaltyScoreSign(playerId: string, sign: "plus" | "minus") {
-    const currentValue = scoreInputs[playerId] ?? "0";
+    const currentValue = scoreInputs[playerId] ?? "";
     const unsignedValue = currentValue.replace(/^[+-]/, "");
     const nextValue =
       sign === "minus"
         ? `-${unsignedValue === "0" ? "" : unsignedValue}`
-        : unsignedValue || "0";
+        : unsignedValue;
 
     updateScoreInput(playerId, nextValue);
   }
@@ -696,6 +700,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     setError(null);
     setAbortiveDrawType(nextAbortiveDrawType);
     setAbortiveDrawProgression("repeat");
+    setScoreInputs(type === "penalty" ? createBlankScoreInputs(match) : createEmptyScoreInputs(match));
     setRonWinnerCount(1);
     if (nextAbortiveDrawType === "fourRiichi") {
       setRiichiPlayerIds(currentSeatPlayers.map((player) => player.playerId));
@@ -1458,7 +1463,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
             <div className="score-input-grid">
               {currentSeatPlayers.map((player) => {
                 const isEditablePenalty = handType === "penalty";
-                const scoreInputValue = scoreInputs[player.playerId] ?? "0";
+                const scoreInputValue = scoreInputs[player.playerId] ?? "";
                 const isNegative = scoreInputValue.startsWith("-");
                 const displayedScoreValue =
                   handType === "win" ||
