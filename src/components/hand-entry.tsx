@@ -357,6 +357,13 @@ function getNextHandProgression(params: {
 }) {
   const currentDealerPlayerId = getCurrentDealerPlayerId(params.match);
 
+  if (params.handType === "penalty") {
+    return {
+      nextRound: params.match.currentRound,
+      nextHonba: params.match.currentHonba,
+    };
+  }
+
   if (params.handType === "abortive-draw") {
     return {
       nextRound:
@@ -560,6 +567,8 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
   const nextRiichiSticks =
     handType === "draw" || handType === "abortive-draw"
       ? entryMatch.currentRiichiSticks + riichiPlayerIds.length
+      : handType === "penalty"
+        ? entryMatch.currentRiichiSticks
       : 0;
   const currentDealerPlayerId = getCurrentDealerPlayerId(entryMatch);
   const currentSeatPlayers = useMemo(() => getCurrentSeatPlayers(entryMatch), [entryMatch]);
@@ -936,7 +945,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
       });
       const nextScores = applyScoreDeltas(currentScores, scoreDeltas);
       const nextRiichiSticksForFinalResults =
-        handType === "draw" || handType === "abortive-draw" ? nextRiichiSticks : 0;
+        handType === "draw" || handType === "abortive-draw" || handType === "penalty"
+          ? nextRiichiSticks
+          : 0;
       const calculatedFinalResults = calculateMatchFinalResults(
         match.players,
         nextScores,
@@ -950,6 +961,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           : undefined;
       const shouldFinishByRule =
         handType !== "abortive-draw" &&
+        handType !== "penalty" &&
         shouldFinishAfterHand({
           match: entryMatch,
           handType,
