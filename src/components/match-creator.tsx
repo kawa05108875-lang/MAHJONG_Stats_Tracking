@@ -300,11 +300,16 @@ function createMatchBlockSummaries(matches: MatchSummary[]): MatchBlockSummary[]
 function determineMatchBlockAssignment(
   matches: MatchSummary[],
   date: string,
+  players: MatchPlayer[],
   preferredMatch?: MatchSummary | null,
 ): MatchBlockAssignment {
   const referenceMatch = preferredMatch ?? matches[0] ?? null;
 
-  if (!referenceMatch || !isWithinSameMatchBlock(referenceMatch.date, date)) {
+  if (
+    !referenceMatch ||
+    !isWithinSameMatchBlock(referenceMatch.date, date) ||
+    !samePlayerSet(referenceMatch.players, players)
+  ) {
     return {
       matchBlockStartedDate: date,
     };
@@ -539,7 +544,7 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
     setCreatedMatchId(null);
 
     try {
-      const blockAssignment = determineMatchBlockAssignment(matches, date);
+      const blockAssignment = determineMatchBlockAssignment(matches, date, selectedPlayers);
       const matchId = await createMatch({
         groupId: group.groupId,
         date,
@@ -639,7 +644,12 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       const nextPlayers =
         mode === "rotate" ? rotateDealer(selectedMatch.players) : shuffleSeats(selectedMatch.players);
       const nextDate = todayString();
-      const blockAssignment = determineMatchBlockAssignment(matches, nextDate, selectedMatch);
+      const blockAssignment = determineMatchBlockAssignment(
+        matches,
+        nextDate,
+        nextPlayers,
+        selectedMatch,
+      );
       const matchId = await createMatch({
         groupId: group.groupId,
         date: nextDate,
