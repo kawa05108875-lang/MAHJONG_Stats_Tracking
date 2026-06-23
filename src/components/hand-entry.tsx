@@ -588,6 +588,43 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
     [entryMatch.rule.abortiveDrawEnabled],
   );
   const winnerIsDealer = effectiveWinnerPlayerIds[0] === currentDealerPlayerId;
+  const tsumoPaymentPreview = useMemo(() => {
+    if (handType !== "win" || winType !== "tsumo" || !effectiveWinnerPlayerIds[0]) {
+      return null;
+    }
+
+    const winnerPlayerId = effectiveWinnerPlayerIds[0];
+    const winnerDelta =
+      scoreDeltas.find((scoreDelta) => scoreDelta.playerId === winnerPlayerId)?.delta ?? 0;
+
+    if (winnerIsDealer) {
+      const payment = parseScore(dealerTsumoPoint) + entryMatch.currentHonba * TSUMO_HONBA_BONUS;
+
+      if (payment <= 0) {
+        return null;
+      }
+
+      return `入力確認: 全員 ${payment.toLocaleString()}点支払い / 和了者 +${winnerDelta.toLocaleString()}点`;
+    }
+
+    const childPayment = parseScore(childTsumoPoint) + entryMatch.currentHonba * TSUMO_HONBA_BONUS;
+    const dealerPayment = parseScore(dealerTsumoPoint) + entryMatch.currentHonba * TSUMO_HONBA_BONUS;
+
+    if (childPayment <= 0 || dealerPayment <= 0) {
+      return null;
+    }
+
+    return `入力確認: 子は ${childPayment.toLocaleString()}点、親は ${dealerPayment.toLocaleString()}点支払い / 和了者 +${winnerDelta.toLocaleString()}点`;
+  }, [
+    childTsumoPoint,
+    dealerTsumoPoint,
+    effectiveWinnerPlayerIds,
+    entryMatch.currentHonba,
+    handType,
+    scoreDeltas,
+    winType,
+    winnerIsDealer,
+  ]);
   const currentScores = useMemo(
     () => calculateCurrentScores(entryMatch.players, calculationHands, entryMatch.rule.initialScore),
     [calculationHands, entryMatch.players, entryMatch.rule.initialScore],
@@ -926,6 +963,21 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
           : "子ツモの子支払い点と親支払い点を入力してください。",
       );
       return;
+    }
+
+    if (
+      handType === "win" &&
+      winType === "tsumo" &&
+      !winnerIsDealer &&
+      parseScore(dealerTsumoPoint) <= parseScore(childTsumoPoint)
+    ) {
+      const confirmed = window.confirm(
+        "子のツモで、親の支払い点が子の支払い点以下になっています。入力が逆の可能性があります。このまま保存しますか？",
+      );
+
+      if (!confirmed) {
+        return;
+      }
     }
 
     if (handType === "draw" && !drawRiichiSticksConfirmed) {
@@ -1322,7 +1374,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                   ) : (
                     <div className="score-input-grid">
                       <label>
-                        <span>子ツモ 子支払い点（素点・本場なし）</span>
+                        <span>子ツモ 子からの支払い点（素点・本場なし）</span>
                         <input
                           inputMode="numeric"
                           value={childTsumoPoint}
@@ -1331,7 +1383,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                         />
                       </label>
                       <label>
-                        <span>子ツモ 親支払い点（素点・本場なし）</span>
+                        <span>子ツモ 親からの支払い点（素点・本場なし）</span>
                         <input
                           inputMode="numeric"
                           value={dealerTsumoPoint}
@@ -1547,6 +1599,9 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
                 ? " / 支払いはマイナス、受け取りはプラスで入力してください"
                 : ""}
             </p>
+            {tsumoPaymentPreview ? (
+              <p className="notice-text">{tsumoPaymentPreview}</p>
+            ) : null}
 
             <button type="submit" className="primary-button sticky-action" disabled={saving}>
               {saving ? "保存中..." : editingHand ? "修正を保存" : "局結果を保存"}
