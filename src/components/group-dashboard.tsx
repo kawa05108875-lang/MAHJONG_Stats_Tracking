@@ -92,14 +92,6 @@ function ruleFormKey(ruleForm: RuleForm) {
   return JSON.stringify(ruleForm);
 }
 
-function shortGroupId(groupId: string) {
-  if (groupId.length <= 12) {
-    return groupId;
-  }
-
-  return `${groupId.slice(0, 6)}...${groupId.slice(-4)}`;
-}
-
 export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -456,7 +448,7 @@ export function GroupDashboard({ user, onLogout }: GroupDashboardProps) {
                   <h2>{selectedGroup.name}</h2>
                   <div className="share-code">
                     <span title={selectedGroup.groupId}>
-                      ID {shortGroupId(selectedGroup.groupId)}
+                      ID {selectedGroup.groupId}
                     </span>
                     <button
                       type="button"

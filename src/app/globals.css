@@ -641,6 +641,7 @@ select:focus {
 .share-code span {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   min-height: 28px;
   padding: 0 8px;
   border: 1px solid var(--line);
@@ -650,6 +651,8 @@ select:focus {
   font-family: var(--font-geist-mono), monospace;
   font-size: 0.78rem;
   line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .share-code .small-utility-button {
