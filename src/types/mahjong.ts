@@ -173,6 +173,7 @@ export type PlayerStats = {
   totalScore: number;
   averageScore: number;
   riichiCount: number;
+  riichiWinCount: number;
   winCount: number;
   dealInCount: number;
   tsumoWinCount: number;
@@ -182,6 +183,7 @@ export type PlayerStats = {
   totalDealInScore: number;
   averageDealInScore: number;
   riichiRate: number;
+  riichiWinRate: number;
   firstPlaceCount: number;
   secondPlaceCount: number;
   thirdPlaceCount: number;

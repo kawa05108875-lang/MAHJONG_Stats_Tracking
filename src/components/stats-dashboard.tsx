@@ -23,6 +23,7 @@ type SortKey =
   | "averagePoint"
   | "winRate"
   | "riichiRate"
+  | "riichiWinRate"
   | "tsumoRate"
   | "averageWinScore"
   | "dealInRate"
@@ -38,6 +39,7 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: "averagePoint", label: "平均ポイント" },
   { key: "winRate", label: "和了率" },
   { key: "riichiRate", label: "立直率" },
+  { key: "riichiWinRate", label: "立直和了率" },
   { key: "tsumoRate", label: "ツモ率" },
   { key: "averageWinScore", label: "平均打点" },
   { key: "dealInRate", label: "放銃率" },
@@ -74,6 +76,7 @@ function formatSortValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
   if (
     sortKey === "winRate" ||
     sortKey === "riichiRate" ||
+    sortKey === "riichiWinRate" ||
     sortKey === "tsumoRate" ||
     sortKey === "dealInRate" ||
     sortKey === "winDealInDiff" ||
@@ -186,6 +189,10 @@ function StatsDetailCard({ playerStats }: { playerStats: PlayerStatsSummary }) {
           <strong>{formatRate(playerStats.riichiRate)}</strong>
         </div>
         <div className="metric">
+          <span className="label">立直和了率</span>
+          <strong>{formatRate(playerStats.riichiWinRate)}</strong>
+        </div>
+        <div className="metric">
           <span className="label">放銃率</span>
           <strong>{formatRate(playerStats.dealInRate)}</strong>
         </div>
@@ -204,10 +211,6 @@ function StatsDetailCard({ playerStats }: { playerStats: PlayerStatsSummary }) {
         <div className="metric">
           <span className="label">平均放銃打点</span>
           <strong>{formatScore(playerStats.averageDealInScore)}</strong>
-        </div>
-        <div className="metric">
-          <span className="label">ロン率</span>
-          <strong>{formatRate(playerStats.ronRate)}</strong>
         </div>
         <div className="metric">
           <span className="label">参加局数</span>

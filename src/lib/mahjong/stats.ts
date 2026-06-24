@@ -25,7 +25,7 @@ export type HandForStats = Pick<
 
 type MutableStats = Omit<PlayerStats, "updatedAt">;
 
-export const CURRENT_PLAYER_STATS_VERSION = 3;
+export const CURRENT_PLAYER_STATS_VERSION = 6;
 
 function divideOrZero(value: number, divisor: number) {
   return divisor === 0 ? 0 : value / divisor;
@@ -44,6 +44,7 @@ function createEmptyStats(player: Pick<Player, "playerId" | "groupId">): Mutable
     totalScore: 0,
     averageScore: 0,
     riichiCount: 0,
+    riichiWinCount: 0,
     winCount: 0,
     dealInCount: 0,
     tsumoWinCount: 0,
@@ -53,6 +54,7 @@ function createEmptyStats(player: Pick<Player, "playerId" | "groupId">): Mutable
     totalDealInScore: 0,
     averageDealInScore: 0,
     riichiRate: 0,
+    riichiWinRate: 0,
     firstPlaceCount: 0,
     secondPlaceCount: 0,
     thirdPlaceCount: 0,
@@ -122,6 +124,10 @@ function applyHand(stats: MutableStats, hand: HandForStats) {
     } else if (hand.winType === "ron") {
       stats.ronWinCount += 1;
     }
+
+    if (hand.riichiPlayerIds.includes(stats.playerId)) {
+      stats.riichiWinCount += 1;
+    }
   }
 
   if (hand.winType === "ron" && hand.loserPlayerId === stats.playerId) {
@@ -154,11 +160,12 @@ function finalizeStats(stats: MutableStats, updatedAt: AppTimestamp): PlayerStat
     averageWinScore: divideOrZero(stats.totalWinScore, stats.winCount),
     averageDealInScore: divideOrZero(stats.totalDealInScore, stats.dealInCount),
     riichiRate: divideOrZero(stats.riichiCount, stats.handCount),
+    riichiWinRate: divideOrZero(stats.riichiWinCount, stats.riichiCount),
     winRate: divideOrZero(stats.winCount, stats.handCount),
     dealInRate: divideOrZero(stats.dealInCount, stats.handCount),
     winDealInDiff: divideOrZero(stats.winCount - stats.dealInCount, stats.handCount),
-    tsumoRate: divideOrZero(stats.tsumoWinCount, stats.handCount),
-    ronRate: divideOrZero(stats.ronWinCount, stats.handCount),
+    tsumoRate: divideOrZero(stats.tsumoWinCount, stats.winCount),
+    ronRate: divideOrZero(stats.ronWinCount, stats.winCount),
     firstPlaceRate: divideOrZero(stats.firstPlaceCount, stats.matchCount),
     secondOrBetterRate: divideOrZero(
       stats.firstPlaceCount + stats.secondPlaceCount,

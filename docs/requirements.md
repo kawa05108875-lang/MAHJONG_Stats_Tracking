@@ -192,8 +192,8 @@
 - ラス率
 - 和了率
 - 放銃率
+- 立直和了率
 - ツモ率
-- ロン率
 
 ユーザーの言う「放ラ率」は「和了率」を指す用語として扱う。アプリ内の表示名は、誤解を避けるため「和了率」を基本とする。
 
@@ -294,8 +294,9 @@
 
 - 和了率 = 和了局数 ÷ 参加局数
 - 放銃率 = 放銃局数 ÷ 参加局数
-- ツモ率 = ツモ和了局数 ÷ 参加局数
-- ロン率 = ロン和了局数 ÷ 参加局数
+- ツモ率 = ツモ和了回数 ÷ 総和了回数
+- ロン率 = ロン和了回数 ÷ 総和了回数
+- 立直和了率 = 立直して和了した回数 ÷ 立直した回数
 - トップ率 = 1着回数 ÷ 半荘数
 - 連対率 = 1着回数と2着回数の合計 ÷ 半荘数
 - ラス率 = 4着回数 ÷ 半荘数
@@ -415,6 +416,8 @@ v1のroleは全員同等のmemberとする。
 - averagePoint
 - averageRank
 - totalScore
+- riichiCount
+- riichiWinCount
 - winCount
 - dealInCount
 - tsumoWinCount
@@ -423,6 +426,8 @@ v1のroleは全員同等のmemberとする。
 - averageWinScore
 - totalDealInScore
 - averageDealInScore
+- riichiRate
+- riichiWinRate
 - firstPlaceCount
 - secondPlaceCount
 - thirdPlaceCount

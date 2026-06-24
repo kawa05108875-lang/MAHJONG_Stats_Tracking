@@ -135,6 +135,7 @@ service cloud.firestore {
         "totalScore",
         "averageScore",
         "riichiCount",
+        "riichiWinCount",
         "winCount",
         "dealInCount",
         "tsumoWinCount",
@@ -144,6 +145,7 @@ service cloud.firestore {
         "totalDealInScore",
         "averageDealInScore",
         "riichiRate",
+        "riichiWinRate",
         "firstPlaceCount",
         "secondPlaceCount",
         "thirdPlaceCount",
@@ -170,6 +172,7 @@ service cloud.firestore {
           "totalScore",
           "averageScore",
           "riichiCount",
+          "riichiWinCount",
           "winCount",
           "dealInCount",
           "tsumoWinCount",
@@ -179,6 +182,7 @@ service cloud.firestore {
           "totalDealInScore",
           "averageDealInScore",
           "riichiRate",
+          "riichiWinRate",
           "firstPlaceCount",
           "secondPlaceCount",
           "thirdPlaceCount",
@@ -195,7 +199,7 @@ service cloud.firestore {
         ])
         && request.resource.data.playerId == playerId
         && request.resource.data.groupId is string
-        && request.resource.data.statsVersion == 3
+        && request.resource.data.statsVersion == 6
         && request.resource.data.matchCount is number
         && request.resource.data.handCount is number
         && request.resource.data.totalPoint is number
@@ -204,6 +208,7 @@ service cloud.firestore {
         && request.resource.data.totalScore is number
         && request.resource.data.averageScore is number
         && request.resource.data.riichiCount is number
+        && request.resource.data.riichiWinCount is number
         && request.resource.data.winCount is number
         && request.resource.data.dealInCount is number
         && request.resource.data.tsumoWinCount is number
@@ -213,6 +218,7 @@ service cloud.firestore {
         && request.resource.data.totalDealInScore is number
         && request.resource.data.averageDealInScore is number
         && request.resource.data.riichiRate is number
+        && request.resource.data.riichiWinRate is number
         && request.resource.data.firstPlaceCount is number
         && request.resource.data.secondPlaceCount is number
         && request.resource.data.thirdPlaceCount is number
