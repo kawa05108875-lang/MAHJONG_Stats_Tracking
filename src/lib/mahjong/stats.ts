@@ -25,7 +25,7 @@ export type HandForStats = Pick<
 
 type MutableStats = Omit<PlayerStats, "updatedAt">;
 
-export const CURRENT_PLAYER_STATS_VERSION = 2;
+export const CURRENT_PLAYER_STATS_VERSION = 3;
 
 function divideOrZero(value: number, divisor: number) {
   return divisor === 0 ? 0 : value / divisor;
@@ -50,6 +50,8 @@ function createEmptyStats(player: Pick<Player, "playerId" | "groupId">): Mutable
     ronWinCount: 0,
     totalWinScore: 0,
     averageWinScore: 0,
+    totalDealInScore: 0,
+    averageDealInScore: 0,
     riichiRate: 0,
     firstPlaceCount: 0,
     secondPlaceCount: 0,
@@ -57,6 +59,7 @@ function createEmptyStats(player: Pick<Player, "playerId" | "groupId">): Mutable
     fourthPlaceCount: 0,
     winRate: 0,
     dealInRate: 0,
+    winDealInDiff: 0,
     tsumoRate: 0,
     ronRate: 0,
     firstPlaceRate: 0,
@@ -122,7 +125,17 @@ function applyHand(stats: MutableStats, hand: HandForStats) {
   }
 
   if (hand.winType === "ron" && hand.loserPlayerId === stats.playerId) {
+    const scoreDelta = hand.scoreDeltas.find(
+      (delta) => delta.playerId === stats.playerId,
+    );
+    const riichiStickPaidByLoser = hand.riichiPlayerIds.includes(stats.playerId) ? 1000 : 0;
+    const dealInScore = Math.max(
+      Math.abs(Math.min(scoreDelta?.delta ?? 0, 0)) - riichiStickPaidByLoser,
+      0,
+    );
+
     stats.dealInCount += 1;
+    stats.totalDealInScore += dealInScore;
   }
 }
 
@@ -139,9 +152,11 @@ function finalizeStats(stats: MutableStats, updatedAt: AppTimestamp): PlayerStat
     averageRank: divideOrZero(rankTotal, stats.matchCount),
     averageScore: divideOrZero(stats.totalScore, stats.matchCount),
     averageWinScore: divideOrZero(stats.totalWinScore, stats.winCount),
+    averageDealInScore: divideOrZero(stats.totalDealInScore, stats.dealInCount),
     riichiRate: divideOrZero(stats.riichiCount, stats.handCount),
     winRate: divideOrZero(stats.winCount, stats.handCount),
     dealInRate: divideOrZero(stats.dealInCount, stats.handCount),
+    winDealInDiff: divideOrZero(stats.winCount - stats.dealInCount, stats.handCount),
     tsumoRate: divideOrZero(stats.tsumoWinCount, stats.handCount),
     ronRate: divideOrZero(stats.ronWinCount, stats.handCount),
     firstPlaceRate: divideOrZero(stats.firstPlaceCount, stats.matchCount),

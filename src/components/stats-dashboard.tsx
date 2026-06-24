@@ -26,6 +26,8 @@ type SortKey =
   | "tsumoRate"
   | "averageWinScore"
   | "dealInRate"
+  | "winDealInDiff"
+  | "averageDealInScore"
   | "firstPlaceRate"
   | "secondOrBetterRate"
   | "fourthPlaceRate";
@@ -39,6 +41,8 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: "tsumoRate", label: "ツモ率" },
   { key: "averageWinScore", label: "平均打点" },
   { key: "dealInRate", label: "放銃率" },
+  { key: "winDealInDiff", label: "和放差" },
+  { key: "averageDealInScore", label: "平均放銃粗点" },
   { key: "firstPlaceRate", label: "トップ率" },
   { key: "secondOrBetterRate", label: "連対率" },
   { key: "fourthPlaceRate", label: "ラス率" },
@@ -72,6 +76,7 @@ function formatSortValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
     sortKey === "riichiRate" ||
     sortKey === "tsumoRate" ||
     sortKey === "dealInRate" ||
+    sortKey === "winDealInDiff" ||
     sortKey === "firstPlaceRate" ||
     sortKey === "secondOrBetterRate" ||
     sortKey === "fourthPlaceRate"
@@ -83,7 +88,7 @@ function formatSortValue(playerStats: PlayerStatsSummary, sortKey: SortKey) {
     return value.toFixed(2);
   }
 
-  if (sortKey === "averageWinScore") {
+  if (sortKey === "averageWinScore" || sortKey === "averageDealInScore") {
     return formatScore(value);
   }
 
@@ -94,7 +99,10 @@ function compareStats(left: PlayerStatsSummary, right: PlayerStatsSummary, sortK
   const leftValue = statValue(left, sortKey);
   const rightValue = statValue(right, sortKey);
   const primaryDiff =
-    sortKey === "averageRank" || sortKey === "dealInRate" || sortKey === "fourthPlaceRate"
+    sortKey === "averageRank" ||
+    sortKey === "dealInRate" ||
+    sortKey === "averageDealInScore" ||
+    sortKey === "fourthPlaceRate"
       ? leftValue - rightValue
       : rightValue - leftValue;
 
@@ -119,7 +127,12 @@ function findStatsById(
 }
 
 function sortDirectionLabel(sortKey: SortKey) {
-  if (sortKey === "averageRank" || sortKey === "dealInRate" || sortKey === "fourthPlaceRate") {
+  if (
+    sortKey === "averageRank" ||
+    sortKey === "dealInRate" ||
+    sortKey === "averageDealInScore" ||
+    sortKey === "fourthPlaceRate"
+  ) {
     return "低い順";
   }
 
@@ -177,12 +190,20 @@ function StatsDetailCard({ playerStats }: { playerStats: PlayerStatsSummary }) {
           <strong>{formatRate(playerStats.dealInRate)}</strong>
         </div>
         <div className="metric">
+          <span className="label">和放差</span>
+          <strong>{formatRate(playerStats.winDealInDiff)}</strong>
+        </div>
+        <div className="metric">
           <span className="label">ツモ率</span>
           <strong>{formatRate(playerStats.tsumoRate)}</strong>
         </div>
         <div className="metric">
           <span className="label">平均打点</span>
           <strong>{formatScore(playerStats.averageWinScore)}</strong>
+        </div>
+        <div className="metric">
+          <span className="label">平均放銃粗点</span>
+          <strong>{formatScore(playerStats.averageDealInScore)}</strong>
         </div>
         <div className="metric">
           <span className="label">ロン率</span>

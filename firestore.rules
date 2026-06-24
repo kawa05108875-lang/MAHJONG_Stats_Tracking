@@ -141,6 +141,8 @@ service cloud.firestore {
         "ronWinCount",
         "totalWinScore",
         "averageWinScore",
+        "totalDealInScore",
+        "averageDealInScore",
         "riichiRate",
         "firstPlaceCount",
         "secondPlaceCount",
@@ -148,6 +150,7 @@ service cloud.firestore {
         "fourthPlaceCount",
         "winRate",
         "dealInRate",
+        "winDealInDiff",
         "tsumoRate",
         "ronRate",
         "firstPlaceRate",
@@ -173,6 +176,8 @@ service cloud.firestore {
           "ronWinCount",
           "totalWinScore",
           "averageWinScore",
+          "totalDealInScore",
+          "averageDealInScore",
           "riichiRate",
           "firstPlaceCount",
           "secondPlaceCount",
@@ -180,6 +185,7 @@ service cloud.firestore {
           "fourthPlaceCount",
           "winRate",
           "dealInRate",
+          "winDealInDiff",
           "tsumoRate",
           "ronRate",
           "firstPlaceRate",
@@ -189,7 +195,7 @@ service cloud.firestore {
         ])
         && request.resource.data.playerId == playerId
         && request.resource.data.groupId is string
-        && request.resource.data.statsVersion == 2
+        && request.resource.data.statsVersion == 3
         && request.resource.data.matchCount is number
         && request.resource.data.handCount is number
         && request.resource.data.totalPoint is number
@@ -204,6 +210,8 @@ service cloud.firestore {
         && request.resource.data.ronWinCount is number
         && request.resource.data.totalWinScore is number
         && request.resource.data.averageWinScore is number
+        && request.resource.data.totalDealInScore is number
+        && request.resource.data.averageDealInScore is number
         && request.resource.data.riichiRate is number
         && request.resource.data.firstPlaceCount is number
         && request.resource.data.secondPlaceCount is number
@@ -211,6 +219,7 @@ service cloud.firestore {
         && request.resource.data.fourthPlaceCount is number
         && request.resource.data.winRate is number
         && request.resource.data.dealInRate is number
+        && request.resource.data.winDealInDiff is number
         && request.resource.data.tsumoRate is number
         && request.resource.data.ronRate is number
         && request.resource.data.firstPlaceRate is number

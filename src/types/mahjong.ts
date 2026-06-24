@@ -179,6 +179,8 @@ export type PlayerStats = {
   ronWinCount: number;
   totalWinScore: number;
   averageWinScore: number;
+  totalDealInScore: number;
+  averageDealInScore: number;
   riichiRate: number;
   firstPlaceCount: number;
   secondPlaceCount: number;
@@ -186,6 +188,7 @@ export type PlayerStats = {
   fourthPlaceCount: number;
   winRate: number;
   dealInRate: number;
+  winDealInDiff: number;
   tsumoRate: number;
   ronRate: number;
   firstPlaceRate: number;

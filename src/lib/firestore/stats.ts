@@ -35,6 +35,8 @@ function createEmptyStatsSummary(player: Pick<Player, "playerId" | "groupId" | "
     ronWinCount: 0,
     totalWinScore: 0,
     averageWinScore: 0,
+    totalDealInScore: 0,
+    averageDealInScore: 0,
     riichiRate: 0,
     firstPlaceCount: 0,
     secondPlaceCount: 0,
@@ -42,6 +44,7 @@ function createEmptyStatsSummary(player: Pick<Player, "playerId" | "groupId" | "
     fourthPlaceCount: 0,
     winRate: 0,
     dealInRate: 0,
+    winDealInDiff: 0,
     tsumoRate: 0,
     ronRate: 0,
     firstPlaceRate: 0,
@@ -58,7 +61,10 @@ function hasCurrentStatsFields(stats: PlayerStats | undefined) {
     typeof stats.riichiCount === "number" &&
     typeof stats.riichiRate === "number" &&
     typeof stats.totalWinScore === "number" &&
-    typeof stats.averageWinScore === "number"
+    typeof stats.averageWinScore === "number" &&
+    typeof stats.totalDealInScore === "number" &&
+    typeof stats.averageDealInScore === "number" &&
+    typeof stats.winDealInDiff === "number"
   );
 }
 
@@ -157,6 +163,9 @@ export async function getGroupPlayerStats(groupId: string): Promise<PlayerStatsS
         riichiCount: stats.riichiCount ?? 0,
         totalWinScore: stats.totalWinScore ?? 0,
         averageWinScore: stats.averageWinScore ?? 0,
+        totalDealInScore: stats.totalDealInScore ?? 0,
+        averageDealInScore: stats.averageDealInScore ?? 0,
+        winDealInDiff: stats.winDealInDiff ?? 0,
         riichiRate: stats.riichiRate ?? 0,
       } satisfies PlayerStatsSummary;
     })

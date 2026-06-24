@@ -419,12 +419,17 @@ v1のroleは全員同等のmemberとする。
 - dealInCount
 - tsumoWinCount
 - ronWinCount
+- totalWinScore
+- averageWinScore
+- totalDealInScore
+- averageDealInScore
 - firstPlaceCount
 - secondPlaceCount
 - thirdPlaceCount
 - fourthPlaceCount
 - winRate
 - dealInRate
+- winDealInDiff
 - tsumoRate
 - ronRate
 - firstPlaceRate
