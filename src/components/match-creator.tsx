@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import type { User } from "firebase/auth";
 import { HandEntry } from "@/components/hand-entry";
 import {
+  getMatchHands,
+  updateHandScoreDeltasAndMatchFinalResults,
+  type HandSummary,
+} from "@/lib/firestore/hands";
+import {
   createMatch,
   getGroupMatches,
   type MatchSummary,
@@ -12,9 +17,11 @@ import { deleteMatchData } from "@/lib/firestore/maintenance";
 import { getGroupPlayers, type PlayerSummary } from "@/lib/firestore/players";
 import { recalculateGroupPlayerStats } from "@/lib/firestore/stats";
 import type { GroupSummary } from "@/lib/firestore/groups";
+import { calculateMatchFinalResults } from "@/lib/mahjong";
 import type {
   MatchFinalResult,
   MatchPlayer,
+  ScoreDelta,
   SeatIndex,
 } from "@/types";
 
@@ -52,6 +59,18 @@ type MatchBlockAssignment = {
 };
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
+const HONBA_CORRECTION_STARTED_DATE = "2026-06-20";
+const HONBA_CORRECTION_MATCH_NUMBER = 10;
+const HONBA_CORRECTION_PLAYER_NAMES = new Set(["かいと", "カイト"]);
+const HONBA_CORRECTION_MEMO = "2026-06-20 第10半荘 かいとツモ本場補正済み";
+
+type HonbaCorrectionCandidate = {
+  match: MatchSummary;
+  hand: HandSummary;
+  correctedScoreDeltas: ScoreDelta[];
+  correctedFinalResults?: MatchFinalResult[];
+  correctedMemo: string;
+};
 
 function notifyStatsChanged(groupId: string) {
   window.dispatchEvent(
@@ -126,6 +145,116 @@ function shuffleSeats(players: MatchPlayer[]) {
     ...player,
     seatIndex: index as SeatIndex,
   }));
+}
+
+function isHonbaCorrectionPlayerName(name: string) {
+  return HONBA_CORRECTION_PLAYER_NAMES.has(name.trim());
+}
+
+function applyHonbaCorrectionScoreDeltas(
+  match: MatchSummary,
+  currentScoreDeltas: ScoreDelta[],
+  winnerPlayerId: string,
+) {
+  const currentDeltaByPlayerId = new Map(
+    currentScoreDeltas.map((scoreDelta) => [scoreDelta.playerId, scoreDelta.delta]),
+  );
+
+  return match.players.map((player) => ({
+    playerId: player.playerId,
+    delta:
+      (currentDeltaByPlayerId.get(player.playerId) ?? 0) +
+      (player.playerId === winnerPlayerId ? 300 : -100),
+  }));
+}
+
+function recalculateFinalResultsWithScoreDeltas(
+  match: MatchSummary,
+  currentScoreDeltas: ScoreDelta[],
+  correctedScoreDeltas: ScoreDelta[],
+) {
+  if (!match.finalResults) {
+    return undefined;
+  }
+
+  const correctedScores = match.finalResults.reduce<Record<string, number>>((scores, result) => {
+    const currentDelta =
+      currentScoreDeltas.find((scoreDelta) => scoreDelta.playerId === result.playerId)?.delta ?? 0;
+    const correctedDelta =
+      correctedScoreDeltas.find((scoreDelta) => scoreDelta.playerId === result.playerId)?.delta ?? 0;
+
+    scores[result.playerId] = result.finalScore - currentDelta + correctedDelta;
+    return scores;
+  }, {});
+
+  return calculateMatchFinalResults(
+    match.players,
+    correctedScores,
+    match.dealerPlayerId,
+    match.rule,
+  );
+}
+
+async function findHonbaCorrectionCandidates(
+  matches: MatchSummary[],
+  groupId: string,
+): Promise<HonbaCorrectionCandidate[]> {
+  const targetMatches = matches.filter(
+    (match) =>
+      match.matchBlockStartedDate === HONBA_CORRECTION_STARTED_DATE &&
+      match.matchBlockNumber === HONBA_CORRECTION_MATCH_NUMBER,
+  );
+
+  if (targetMatches.length !== 1) {
+    return [];
+  }
+
+  const match = targetMatches[0];
+  const winner = match.players.find((player) => isHonbaCorrectionPlayerName(player.name));
+
+  if (!winner) {
+    return [];
+  }
+
+  const hands = await getMatchHands(groupId, match.matchId);
+
+  for (const hand of hands) {
+    const winnerPlayerIds = hand.winnerPlayerIds ?? (hand.winnerPlayerId ? [hand.winnerPlayerId] : []);
+
+    if (
+      hand.memo?.includes(HONBA_CORRECTION_MEMO) ||
+      hand.handType !== "win" ||
+      hand.winType !== "tsumo" ||
+      !winnerPlayerIds.includes(winner.playerId)
+    ) {
+      continue;
+    }
+
+    const correctedScoreDeltas = applyHonbaCorrectionScoreDeltas(
+      match,
+      hand.scoreDeltas,
+      winner.playerId,
+    );
+    const correctedMemo = hand.memo
+      ? `${hand.memo}\n${HONBA_CORRECTION_MEMO}`
+      : HONBA_CORRECTION_MEMO;
+
+    return [
+      {
+        match,
+        hand,
+        correctedScoreDeltas,
+        correctedFinalResults: recalculateFinalResultsWithScoreDeltas(
+          match,
+          hand.scoreDeltas,
+          correctedScoreDeltas,
+        ),
+        correctedMemo,
+      },
+    ];
+  }
+
+  return [];
 }
 
 function countRecentRotatedMatches(
@@ -485,6 +614,8 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [saving, setSaving] = useState(false);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
   const [startingNextMatch, setStartingNextMatch] = useState<NextMatchMode | null>(null);
+  const [correctingHonbaMistake, setCorrectingHonbaMistake] = useState(false);
+  const [honbaCorrectionMessage, setHonbaCorrectionMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -727,6 +858,61 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       );
     } finally {
       setDeletingMatchId(null);
+    }
+  }
+
+  async function handleCorrectJune20KaitoHonbaMistake() {
+    const confirmed = window.confirm(
+      "2026年6月20日の対局ブロック第10半荘から、かいとのツモ和了に本場分（かいと+300、他3人-100）を加算します。候補が1件だけ見つかった場合のみ実行します。続けますか？",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCorrectingHonbaMistake(true);
+    setError(null);
+    setHonbaCorrectionMessage(null);
+
+    try {
+      const candidates = await findHonbaCorrectionCandidates(matches, group.groupId);
+
+      if (candidates.length !== 1) {
+        setError(
+          `補正候補が${candidates.length}件でした。誤補正を防ぐため、データは変更していません。`,
+        );
+        return;
+      }
+
+      const candidate = candidates[0];
+
+      await updateHandScoreDeltasAndMatchFinalResults({
+        matchId: candidate.match.matchId,
+        handId: candidate.hand.handId,
+        scoreDeltas: candidate.correctedScoreDeltas,
+        finalResults: candidate.correctedFinalResults,
+        memo: candidate.correctedMemo,
+        uid: user.uid,
+      });
+      await recalculateGroupPlayerStats(group.groupId);
+      notifyStatsChanged(group.groupId);
+      await loadData();
+      setHonbaCorrectionMessage(
+        `${candidate.match.matchBlockStartedDate} 第${candidate.match.matchBlockNumber}半荘のかいとツモに本場分を補正しました。`,
+      );
+    } catch (correctionError) {
+      const message =
+        correctionError instanceof Error
+          ? correctionError.message
+          : "本場補正に失敗しました。";
+
+      setError(
+        message.includes("permission")
+          ? "本場補正を保存できませんでした。Firestore Security Rulesを確認してください。"
+          : message,
+      );
+    } finally {
+      setCorrectingHonbaMistake(false);
     }
   }
 
@@ -985,6 +1171,23 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         {!loading && matches.length === 0 ? (
           <p className="empty-state">まだ対局記録がありません。</p>
         ) : null}
+        {!loading && matches.length > 0 ? (
+          <div className="danger-zone payment-correction-tool">
+            <div>
+              <strong>6/20 第10半荘 かいとツモ本場補正</strong>
+              <p className="muted">かいと +300、他3人 -100 を加算します。</p>
+            </div>
+            <button
+              type="button"
+              className="compact-action-button"
+              onClick={() => void handleCorrectJune20KaitoHonbaMistake()}
+              disabled={correctingHonbaMistake || loading}
+            >
+              {correctingHonbaMistake ? "確認中..." : "候補を確認して補正"}
+            </button>
+          </div>
+        ) : null}
+        {honbaCorrectionMessage ? <p className="success-text">{honbaCorrectionMessage}</p> : null}
         {inputtingMatchCount > 0 ? (
           <div className="unfinished-match-notice">
             <strong>入力中の半荘があります</strong>

@@ -259,3 +259,33 @@ export async function updateHandsAndMatchAfterEdit(input: {
 
   await batch.commit();
 }
+
+export async function updateHandScoreDeltasAndMatchFinalResults(input: {
+  matchId: string;
+  handId: string;
+  scoreDeltas: ScoreDelta[];
+  finalResults?: MatchFinalResult[];
+  memo?: string | null;
+  uid: string;
+}) {
+  const db = getFirebaseDb();
+  const now = serverTimestamp();
+  const batch = writeBatch(db);
+
+  batch.update(doc(db, "hands", input.handId), {
+    scoreDeltas: input.scoreDeltas,
+    ...(input.memo !== undefined ? { memo: input.memo } : {}),
+    updatedBy: input.uid,
+    updatedAt: now,
+  });
+
+  if (input.finalResults) {
+    batch.update(doc(db, "matches", input.matchId), {
+      finalResults: input.finalResults,
+      updatedBy: input.uid,
+      updatedAt: now,
+    });
+  }
+
+  await batch.commit();
+}
