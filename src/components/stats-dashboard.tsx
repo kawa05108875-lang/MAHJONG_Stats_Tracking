@@ -42,7 +42,7 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: "averageWinScore", label: "平均打点" },
   { key: "dealInRate", label: "放銃率" },
   { key: "winDealInDiff", label: "和放差" },
-  { key: "averageDealInScore", label: "平均放銃粗点" },
+  { key: "averageDealInScore", label: "平均放銃打点" },
   { key: "firstPlaceRate", label: "トップ率" },
   { key: "secondOrBetterRate", label: "連対率" },
   { key: "fourthPlaceRate", label: "ラス率" },
@@ -202,7 +202,7 @@ function StatsDetailCard({ playerStats }: { playerStats: PlayerStatsSummary }) {
           <strong>{formatScore(playerStats.averageWinScore)}</strong>
         </div>
         <div className="metric">
-          <span className="label">平均放銃粗点</span>
+          <span className="label">平均放銃打点</span>
           <strong>{formatScore(playerStats.averageDealInScore)}</strong>
         </div>
         <div className="metric">
