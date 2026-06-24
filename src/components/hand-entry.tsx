@@ -1401,6 +1401,24 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
 
             {handType === "draw" ? (
               <div className="check-list">
+                <span className="label">リーチ者</span>
+                {currentSeatPlayers.map((player) => (
+                  <label key={player.playerId} className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={riichiPlayerIds.includes(player.playerId)}
+                      onChange={() => toggleRiichiPlayerId(player.playerId)}
+                    />
+                    <span>
+                      {getCurrentHouseLabel(entryMatch, player.seatIndex)} {player.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
+            {handType === "draw" ? (
+              <div className="check-list">
                 <span className="label">聴牌者</span>
                 {currentSeatPlayers.map((player) => {
                   const isRiichiPlayer = riichiPlayerIds.includes(player.playerId);
@@ -1471,7 +1489,7 @@ export function HandEntry({ match, user, onSaved }: HandEntryProps) {
               </>
             ) : null}
 
-            {handType !== "penalty" ? (
+            {handType !== "penalty" && handType !== "draw" ? (
               <div className="check-list">
                 <span className="label">リーチ者</span>
                 {currentSeatPlayers.map((player) => (
