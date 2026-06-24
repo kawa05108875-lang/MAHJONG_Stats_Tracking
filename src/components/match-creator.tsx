@@ -4,11 +4,6 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import type { User } from "firebase/auth";
 import { HandEntry } from "@/components/hand-entry";
 import {
-  getMatchHands,
-  updateHandScoreDeltasAndMatchFinalResults,
-  type HandSummary,
-} from "@/lib/firestore/hands";
-import {
   createMatch,
   getGroupMatches,
   type MatchSummary,
@@ -17,12 +12,9 @@ import { deleteMatchData } from "@/lib/firestore/maintenance";
 import { getGroupPlayers, type PlayerSummary } from "@/lib/firestore/players";
 import { recalculateGroupPlayerStats } from "@/lib/firestore/stats";
 import type { GroupSummary } from "@/lib/firestore/groups";
-import { calculateMatchFinalResults } from "@/lib/mahjong";
 import type {
   MatchFinalResult,
   MatchPlayer,
-  MatchRound,
-  ScoreDelta,
   SeatIndex,
 } from "@/types";
 
@@ -60,18 +52,6 @@ type MatchBlockAssignment = {
 };
 
 const SEAT_LABELS = ["東家", "南家", "西家", "北家"] as const;
-const PAYMENT_CORRECTION_STARTED_DATE = "2026-06-20";
-const PAYMENT_CORRECTION_MATCH_NUMBERS = new Set([4, 5]);
-const PAYMENT_CORRECTION_PLAYER_NAME = "かいと";
-const PAYMENT_CORRECTION_WRONG_ALL = 12000;
-const PAYMENT_CORRECTION_CORRECT_ALL = 8000;
-
-type PaymentCorrectionCandidate = {
-  match: MatchSummary;
-  hand: HandSummary;
-  correctedScoreDeltas: ScoreDelta[];
-  correctedFinalResults?: MatchFinalResult[];
-};
 
 function notifyStatsChanged(groupId: string) {
   window.dispatchEvent(
@@ -146,134 +126,6 @@ function shuffleSeats(players: MatchPlayer[]) {
     ...player,
     seatIndex: index as SeatIndex,
   }));
-}
-
-function getDealerPlayerIdForRound(match: MatchSummary, round: MatchRound) {
-  const initialDealerSeatIndex =
-    match.players.find((player) => player.playerId === match.dealerPlayerId)?.seatIndex ?? 0;
-  const dealerSeatIndex = (initialDealerSeatIndex + round.number - 1) % 4;
-
-  return match.players.find((player) => player.seatIndex === dealerSeatIndex)?.playerId ?? "";
-}
-
-function expectedDealerTsumoAllScoreDeltas(
-  match: MatchSummary,
-  hand: HandSummary,
-  winnerPlayerId: string,
-  allPayment: number,
-) {
-  const paymentWithHonba = allPayment + hand.honba * 100;
-  const riichiPlayerIds = hand.riichiPlayerIds ?? [];
-  const riichiStickPoint = (hand.riichiSticksBefore + riichiPlayerIds.length) * 1000;
-
-  return match.players.map((player) => {
-    const isWinner = player.playerId === winnerPlayerId;
-    const riichiDelta = riichiPlayerIds.includes(player.playerId) ? -1000 : 0;
-
-    return {
-      playerId: player.playerId,
-      delta: isWinner ? paymentWithHonba * 3 + riichiStickPoint + riichiDelta : -paymentWithHonba + riichiDelta,
-    };
-  });
-}
-
-function scoreDeltasMatch(left: ScoreDelta[], right: ScoreDelta[]) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  const rightByPlayerId = new Map(right.map((scoreDelta) => [scoreDelta.playerId, scoreDelta.delta]));
-
-  return left.every((scoreDelta) => rightByPlayerId.get(scoreDelta.playerId) === scoreDelta.delta);
-}
-
-function recalculateFinalResultsWithScoreDeltas(
-  match: MatchSummary,
-  currentScoreDeltas: ScoreDelta[],
-  correctedScoreDeltas: ScoreDelta[],
-) {
-  if (!match.finalResults) {
-    return undefined;
-  }
-
-  const correctedScores = match.finalResults.reduce<Record<string, number>>((scores, result) => {
-    const currentDelta =
-      currentScoreDeltas.find((scoreDelta) => scoreDelta.playerId === result.playerId)?.delta ?? 0;
-    const correctedDelta =
-      correctedScoreDeltas.find((scoreDelta) => scoreDelta.playerId === result.playerId)?.delta ?? 0;
-
-    scores[result.playerId] = result.finalScore - currentDelta + correctedDelta;
-    return scores;
-  }, {});
-
-  return calculateMatchFinalResults(
-    match.players,
-    correctedScores,
-    match.dealerPlayerId,
-    match.rule,
-  );
-}
-
-async function findPaymentCorrectionCandidates(
-  matches: MatchSummary[],
-  groupId: string,
-) {
-  const targetMatches = matches.filter(
-    (match) =>
-      match.matchBlockStartedDate === PAYMENT_CORRECTION_STARTED_DATE &&
-      PAYMENT_CORRECTION_MATCH_NUMBERS.has(match.matchBlockNumber ?? 0),
-  );
-  const candidates: PaymentCorrectionCandidate[] = [];
-
-  for (const match of targetMatches) {
-    const winner = match.players.find((player) => player.name === PAYMENT_CORRECTION_PLAYER_NAME);
-
-    if (!winner) {
-      continue;
-    }
-
-    const hands = await getMatchHands(groupId, match.matchId);
-
-    for (const hand of hands) {
-      const winnerPlayerIds = hand.winnerPlayerIds ?? (hand.winnerPlayerId ? [hand.winnerPlayerId] : []);
-      const expectedWrongScoreDeltas = expectedDealerTsumoAllScoreDeltas(
-        match,
-        hand,
-        winner.playerId,
-        PAYMENT_CORRECTION_WRONG_ALL,
-      );
-
-      if (
-        hand.handType !== "win" ||
-        hand.winType !== "tsumo" ||
-        !winnerPlayerIds.includes(winner.playerId) ||
-        getDealerPlayerIdForRound(match, hand.round) !== winner.playerId ||
-        !scoreDeltasMatch(hand.scoreDeltas, expectedWrongScoreDeltas)
-      ) {
-        continue;
-      }
-
-      const correctedScoreDeltas = expectedDealerTsumoAllScoreDeltas(
-        match,
-        hand,
-        winner.playerId,
-        PAYMENT_CORRECTION_CORRECT_ALL,
-      );
-
-      candidates.push({
-        match,
-        hand,
-        correctedScoreDeltas,
-        correctedFinalResults: recalculateFinalResultsWithScoreDeltas(
-          match,
-          hand.scoreDeltas,
-          correctedScoreDeltas,
-        ),
-      });
-    }
-  }
-
-  return candidates;
 }
 
 function countRecentRotatedMatches(
@@ -632,10 +484,8 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
-  const [correctingPaymentMistake, setCorrectingPaymentMistake] = useState(false);
   const [startingNextMatch, setStartingNextMatch] = useState<NextMatchMode | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [paymentCorrectionMessage, setPaymentCorrectionMessage] = useState<string | null>(null);
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [matchView, setMatchView] = useState<MatchView>("list");
@@ -877,60 +727,6 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
       );
     } finally {
       setDeletingMatchId(null);
-    }
-  }
-
-  async function handleCorrectJune20KaitoPaymentMistake() {
-    const confirmed = window.confirm(
-      "6月20日の対局ブロック第4・第5半荘から、かいとの親ツモ12000オールを8000オールへ補正します。候補が1件だけ見つかった場合のみ実行します。続けますか？",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setCorrectingPaymentMistake(true);
-    setError(null);
-    setPaymentCorrectionMessage(null);
-
-    try {
-      const candidates = await findPaymentCorrectionCandidates(matches, group.groupId);
-
-      if (candidates.length !== 1) {
-        setError(
-          `補正候補が${candidates.length}件でした。誤補正を防ぐため、データは変更していません。`,
-        );
-        return;
-      }
-
-      const candidate = candidates[0];
-
-      await updateHandScoreDeltasAndMatchFinalResults({
-        matchId: candidate.match.matchId,
-        handId: candidate.hand.handId,
-        scoreDeltas: candidate.correctedScoreDeltas,
-        finalResults: candidate.correctedFinalResults,
-        uid: user.uid,
-      });
-      await recalculateGroupPlayerStats(group.groupId);
-      notifyStatsChanged(group.groupId);
-      await loadData();
-      setPaymentCorrectionMessage(
-        `${candidate.match.matchBlockStartedDate} 第${candidate.match.matchBlockNumber}半荘の${PAYMENT_CORRECTION_PLAYER_NAME}親ツモを8000オールへ補正しました。`,
-      );
-    } catch (correctionError) {
-      const message =
-        correctionError instanceof Error
-          ? correctionError.message
-          : "点数補正に失敗しました。";
-
-      setError(
-        message.includes("permission")
-          ? "点数補正に失敗しました。Firestore Security Rulesを確認してください。"
-          : message,
-      );
-    } finally {
-      setCorrectingPaymentMistake(false);
     }
   }
 
@@ -1188,23 +984,6 @@ export function MatchCreator({ group, user }: MatchCreatorProps) {
         {loading ? <p className="muted">対局履歴を読み込んでいます...</p> : null}
         {!loading && matches.length === 0 ? (
           <p className="empty-state">まだ対局記録がありません。</p>
-        ) : null}
-        <div className="danger-zone payment-correction-tool">
-          <div>
-            <strong>6/20 かいと親ツモ補正</strong>
-            <p className="muted">第4・第5半荘の12000オール入力を8000オールへ補正します。</p>
-          </div>
-          <button
-            type="button"
-            className="compact-action-button"
-            onClick={() => void handleCorrectJune20KaitoPaymentMistake()}
-            disabled={correctingPaymentMistake || loading}
-          >
-            {correctingPaymentMistake ? "確認中..." : "候補を確認して補正"}
-          </button>
-        </div>
-        {paymentCorrectionMessage ? (
-          <p className="success-text">{paymentCorrectionMessage}</p>
         ) : null}
         {inputtingMatchCount > 0 ? (
           <div className="unfinished-match-notice">
